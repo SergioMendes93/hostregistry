@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"fmt"
+	"sync"
 	"net/http"
 	"github.com/gorilla/mux"
 )
@@ -34,21 +35,26 @@ type RegionEED struct {
 }
 
 type Host struct {
-        HostID 		string	`json:"hostid,omitempty"`
-        HostClass 	string 	`json:"hostclass,omitempty"`
-		Region 		string	`json:"region,omitempty"`
- /*       TotalResourcesUtilization int
-        CPU_Utilization int
-        MemoryUtilization int
-        AllocatedResources int
-        TotalHostResources int
-        OverbookingFactor int */
+        HostID 		string				`json:"hostid,omitempty"`
+        HostClass 	string 				`json:"hostclass,omitempty"`
+		Region 		string				`json:"region,omitempty"`
+        TotalResourcesUtilization int	`json:"totalresouces,omitempty"`
+        CPU_Utilization int				`json:"cpu,omitempty"`
+        MemoryUtilization int			`json:"memory,omitempty"`
+        AllocatedResources int			`json:"resoucesallocated,omitempty"`
+        TotalHostResources int			`json:"totalresources,omitempty"`
+        OverbookingFactor int 			`json:"overbookingfactor,omitempty"`
 }
 
 var regionLEEHosts RegionLEE
 var regionDEEHosts RegionDEE
 var regionEEDHosts RegionEED
 var hosts []Host
+
+var lockRegionLEE = &syncMutex{}
+var lockRegionDEE = &syncMutex{}
+var lockRegionEED = &syncMutex{}
+var lockHosts = &syncMutex{}
 
 //function used to update host class when a new task arrives
 func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
@@ -58,7 +64,9 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 
 	for index, host := range hosts {
 		if host.HostID == hostID && host.HostClass < newHostClass { //we only update the host class if the current class is lower
+			lockHosts.Lock()
 			hosts[index].HostClass = newHostClass
+			lockHosts.Unlock()
 		}
 	}
 }
@@ -67,23 +75,14 @@ func UpdateHostRegion(hostID string, newRegion string) {
 
 	for index, host := range hosts {
 		if host.HostID == hostID {
+			lockHosts.Lock()
 			hosts[index].Region = newRegion
+			lockHosts.Unlock()
 		}
 	}
 
 }
 
-func GetHost(w http.ResponseWriter, req *http.Request) {
-	params := mux.Vars(req)
-    for _, host := range regionLEEHosts.Class1Hosts {
-        if host.HostID == params["hostid"] {
-		    json.NewEncoder(w).Encode(host)
-            return
-        }
-    }
-    //json.NewEncoder(w).Encode(&Person{})
-
-}
 
 //used by initial scheduling and cut algorithm
 func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
@@ -131,7 +130,7 @@ func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
 func GetHostsLEE_normal(requestClass string) ([]*Host) {
 	//we only get hosts that respect requestClass >= hostClass and order them by ascending order of their class 
 	//class 1 hosts are always selected
-
+	
 	listHosts := regionLEEHosts.Class1Hosts
 
 	if requestClass >= "2" {
@@ -279,7 +278,8 @@ func GetHostsEED(requestClass string) ([]*Host) {
 	return listHosts
 }
 
-
+//loosely sorted so that there's no big overhead in sorting
+//func sort
 
 /*
 func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
