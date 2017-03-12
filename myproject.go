@@ -36,6 +36,7 @@ type RegionEED struct {
 
 type Host struct {
         HostID 		string				`json:"hostid,omitempty"`
+		WorkerNodesID []string			`json:"workernodesid,omitempty"`
         HostClass 	string 				`json:"hostclass,omitempty"`
 		Region 		string				`json:"region,omitempty"`
         TotalResourcesUtilization int	`json:"totalresouces,omitempty"`
@@ -56,6 +57,7 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+
 func CreateHost(w http.ResponseWriter, req *http.Request) {
 	var host Host
 	_ = json.NewDecoder(req.Body).Decode(&host)
@@ -75,6 +77,23 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	} */
 }
 
+//function used to associate a worker to a host when the worker is created
+func AddWorker(w http.ResponseWriter, req *http.Request) {
+	params := mux.Vars(req)
+	hostID := params["hostid"]
+	workerID := params["workerid"]
+
+	for index, host := range hosts {
+		if host.HostID == hostID {
+			lockHosts.Lock()
+			hosts[index].WorkerNodesID = append(hosts[index].WorkerNodesID, workerID) 
+			lockHosts.Unlock()
+		}
+	}
+	fmt.Println(hosts)
+}
+	
+
 //function used to update host class when a new task arrives
 func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
@@ -82,11 +101,11 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	hostID := params["hostid"]
 
 	for index, host := range hosts {
+		lockHosts.Lock()
 		if host.HostID == hostID && host.HostClass < newHostClass { //we only update the host class if the current class is lower
-			lockHosts.Lock()
 			hosts[index].HostClass = newHostClass
-			lockHosts.Unlock()
 		}
+		lockHosts.Unlock()
 	}
 }
 
@@ -349,6 +368,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
 	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
+	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("GET")
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
