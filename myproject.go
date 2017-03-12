@@ -51,10 +51,29 @@ var regionDEEHosts RegionDEE
 var regionEEDHosts RegionEED
 var hosts []Host
 
-var lockRegionLEE = &syncMutex{}
-var lockRegionDEE = &syncMutex{}
-var lockRegionEED = &syncMutex{}
-var lockHosts = &syncMutex{}
+var lockRegionLEE = &sync.Mutex{}
+var lockRegionDEE = &sync.Mutex{}
+var lockRegionEED = &sync.Mutex{}
+var lockHosts = &sync.Mutex{}
+
+func CreateHost(w http.ResponseWriter, req *http.Request) {
+	var host Host
+	_ = json.NewDecoder(req.Body).Decode(&host)
+	
+	//since a host is created it will not have tasks assigned to it so it goes to the LEE region
+	hosts = append(hosts, host)
+	regionLEEHosts.Class1Hosts = append(regionLEEHosts.Class1Hosts, &hosts[len(hosts)-1])	
+	fmt.Println(regionLEEHosts.Class1Hosts)	
+
+	for i := 0; i < len(regionLEEHosts.Class1Hosts); i++ {
+		if regionLEEHosts.Class1Hosts[i].HostID == "1" {
+		fmt.Println(*regionLEEHosts.Class1Hosts[i])
+		}
+	}
+	/*for _, hostB := *regionLEEHosts.Class1Hosts {
+		fmt.Println(hostB)
+	} */
+}
 
 //function used to update host class when a new task arrives
 func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
@@ -325,10 +344,11 @@ func ServeSchedulerRequests() {
 	regionEEDHosts.Class4Hosts = append(regionEEDHosts.Class4Hosts, &hosts[5])
 	regionDEEHosts.Class2Hosts = append(regionDEEHosts.Class2Hosts, &hosts[6])
 
-	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
+//	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}",GetListHostsLEE_DEE).Methods("GET")
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
-	router.HandleFunc{"/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
+	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
+	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
