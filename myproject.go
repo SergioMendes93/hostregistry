@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"github.com/gorilla/mux"
 	"github.com/docker/swarm/scheduler/node"
+	"os/exec"
+	"time"
 )
 type Host struct {
         HostID      string              `json:"hostid,omitempty"`
@@ -61,6 +63,27 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+//function responsible to update task resources when there's a cut
+func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
+
+	params := mux.Vars(req)
+	taskID := params["taskid"]
+	newCPU := params["newcpu"]
+	newMemory := params["newmemory"]
+
+	time.Sleep(time.Second * 2)
+
+    //update the task with cut resources
+    cmd := "docker"
+    args := []string{"update", "-m", newMemory, "-c", newCPU, taskID}
+
+    if err := exec.Command(cmd, args...).Run(); err != nil {
+        fmt.Println("Error using docker update")
+        fmt.Println(err)
+    }
+
+}
+
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
 	var host Host
@@ -84,9 +107,9 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 //function used to associate a worker to a host when the worker is created
 func AddWorker(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
-	hostID := params["hostid"]
+//	hostID := params["hostid"]
 	workerID := params["workerid"]
-	
+/*
 	for index, host := range hosts {
 		if host.HostID == hostID {
 			lockHosts.Lock()
@@ -94,8 +117,14 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 			lockHosts.Unlock()
 			//TODO: por return aqui
 		}
+	}*/ 
+
+	//PARA UMA FASE DE TESTES
+	for index, _ := range hosts {
+		lockHosts.Lock()
+		hosts[index].WorkerNodesID = append(hosts[index].WorkerNodesID, workerID) 
+		lockHosts.Unlock()
 	}
-	fmt.Println(hosts)
 }
 	
 
@@ -140,20 +169,16 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 	
 	//1 for initial scheduling 2 for cut algorithm
 	if listType == "1" {
-		fmt.Println("primeira lista")
 		listHosts = GetHostsLEE_normal(requestClass)
 		listHostsDEE = GetHostsDEE_normal(requestClass)
  
 	} else {
-		fmt.Println("segunda lista")
 		listHosts = GetHostsLEE_cut(requestClass)
 		listHostsDEE = GetHostsDEE_cut(requestClass)
 
 	}
 	listHosts = append(listHosts, listHostsDEE...)
 	
-
-	fmt.Println(listHosts)	
 	json.NewEncoder(w).Encode(listHosts)
 	
 }
@@ -168,7 +193,6 @@ func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
 	
 	listHosts = append(listHosts, listHostsDEE...)
 	
-	fmt.Println(listHosts)
 	json.NewEncoder(w).Encode(listHosts)
 
 }
@@ -341,6 +365,8 @@ func GetHostsEED(requestClass string) ([]*Host) {
 	return listHosts
 }
 
+
+
 //loosely sorted so that there's no big overhead in sorting
 //func sort
 
@@ -394,6 +420,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
 	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
 	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("GET")
+	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}",UpdateTaskResources).Methods("GET")
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
