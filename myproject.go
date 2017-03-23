@@ -63,6 +63,20 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+func KillTasks(w http.ResponseWriter, req *http.Request) {
+	params := mux.Vars(req)
+	taskID := parans["taskid"]
+
+	cmd := "docker"
+    args := []string{"kill",  taskID}
+
+    if err := exec.Command(cmd, args...).Run(); err != nil {
+        fmt.Println("Error using docker update")
+        fmt.Println(err)
+    }
+
+}
+
 //function responsible to update task resources when there's a cut
 func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 
@@ -421,6 +435,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
 	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("GET")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}",UpdateTaskResources).Methods("GET")
+	router.HandleFunc("/host/killtask/{taskid}", KillTask).Methods("GET")
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
