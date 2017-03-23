@@ -63,9 +63,28 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+
+func RescheduleTask(w http.ResponseWriter, req *http.Request) {
+	params := mux.Vars(req)
+	cpu := params["cpu"]
+	memory := params["memory"]
+	requestClass := params["requestclass"]
+	image := params["image"]
+
+	
+	cmd := "docker"
+    args := []string{"run","-itd", "-c", cpu,"-m",memory, "-e", "affinity:requestclass=="+requestClass, "--name", "lala1", image}
+
+    if err := exec.Command(cmd, args...).Run(); err != nil {
+        fmt.Println("Error using docker run")
+        fmt.Println(err)
+    }
+
+}
+
 func KillTasks(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
-	taskID := parans["taskid"]
+	taskID := params["taskid"]
 
 	cmd := "docker"
     args := []string{"kill",  taskID}
@@ -435,7 +454,8 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
 	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("GET")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}",UpdateTaskResources).Methods("GET")
-	router.HandleFunc("/host/killtask/{taskid}", KillTask).Methods("GET")
+	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
+	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
