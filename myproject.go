@@ -12,50 +12,31 @@ import (
 	"time"
 )
 type Host struct {
-        HostID      string              `json:"hostid,omitempty"`
-        WorkerNodesID []string          `json:"workernodesid,omitempty"`
-        WorkerNodes []*node.Node		`json:"workernodes,omitempty"`
-		HostClass   string              `json:"hostclass,omitempty"`
-        Region      string              `json:"region,omitempty"`
-        TotalResourcesUtilization int   `json:"totalresouces,omitempty"`
-        CPU_Utilization int             `json:"cpu,omitempty"`
-        MemoryUtilization int           `json:"memory,omitempty"`
-		AvailableMemory int64			`json:"availablememory,omitempty"`
-		AvailableCPUs int64				`json:"availablecpus,omitempty"`
-        AllocatedResources int          `json:"resoucesallocated,omitempty"`
-        TotalHostResources int          `json:"totalresources,omitempty"`
-        OverbookingFactor int           `json:"overbookingfactor,omitempty"`
+        HostID      string              	`json:"hostid,omitempty"`
+        WorkerNodesID []string          	`json:"workernodesid,omitempty"`
+        WorkerNodes []*node.Node			`json:"workernodes,omitempty"`
+		HostClass   string              	`json:"hostclass,omitempty"`
+        Region      string              	`json:"region,omitempty"`
+        TotalResourcesUtilization string   	`json:"totalresouces,omitempty"`
+        CPU_Utilization int            		`json:"cpu,omitempty"`
+        MemoryUtilization int          		`json:"memory,omitempty"`
+		AvailableMemory int64				`json:"availablememory,omitempty"`
+		AvailableCPUs int64					`json:"availablecpus,omitempty"`
+        AllocatedResources int        	    `json:"resoucesallocated,omitempty"`
+        TotalHostResources int         	    `json:"totalresources,omitempty"`
+        OverbookingFactor int       	    `json:"overbookingfactor,omitempty"`
 }
 
 
 //Each region will have 4 lists, one for each overbooking class
-//LEE=Lowest Energy Efficiency
-type RegionLEE struct {
-	Class1Hosts []*Host 	`json:"class1host, omitempty"`
-	Class2Hosts []*Host		`json:"class2host, omitempty"`	
-	Class3Hosts []*Host 	`json:"class3host, omitempty"`
-	Class4Hosts []*Host 	`json:"class4host, omitempty"`
+//LEE=Lowest Energy Efficiency, DEE =Desired Energy Efficiency EED=Energy Efficiency Degradation
+type Region struct {
+	classHosts map[string][]*Host
 }
 
-//DEE=Desired Energy Efficiency
-type RegionDEE struct {
-	Class1Hosts []*Host 	`json:"class1host, omitempty"`
-	Class2Hosts []*Host		`json:"class2host, omitempty"`	
-	Class3Hosts []*Host 	`json:"class3host, omitempty"`
-	Class4Hosts []*Host 	`json:"class4host, omitempty"`
-}
 
-//EED=Energy Efficiency Degradation
-type RegionEED struct {
-	Class1Hosts []*Host 	`json:"class1host, omitempty"`
-	Class2Hosts []*Host		`json:"class2host, omitempty"`	
-	Class3Hosts []*Host 	`json:"class3host, omitempty"`
-	Class4Hosts []*Host 	`json:"class4host, omitempty"`
-}
+var regions map[string]Region
 
-var regionLEEHosts RegionLEE
-var regionDEEHosts RegionDEE
-var regionEEDHosts RegionEED
 var hosts []Host
 
 var lockRegionLEE = &sync.Mutex{}
@@ -63,9 +44,10 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+
 //adapted binary search algorithm for inserting orderly based on total resources of a host
 //this is ascending order (for EED region)
-func Sort(classList []Task, searchValue string)(int) {
+func Sort(classList []*Host, searchValue string)(int) {
     listLength := len(classList)
     lowerBound := 0
     upperBound := listLength- 1
@@ -73,44 +55,42 @@ func Sort(classList []Task, searchValue string)(int) {
     for {
         midPoint := (upperBound + lowerBound)/2
 
-        fmt.Println(midPoint)
-        if lowerBound > upperBound && classList[midPoint] > searchValue {
+        if lowerBound > upperBound && classList[midPoint].TotalResourcesUtilization > searchValue {
             return midPoint 
         } else if lowerBound > upperBound {
             return midPoint + 1
         }
 
-        if classList[midPoint] < searchValue {
+        if classList[midPoint].TotalResourcesUtilization < searchValue {
             lowerBound = midPoint + 1
-        } else if classList[midPoint] > searchValue {
+        } else if classList[midPoint].TotalResourcesUtilization > searchValue {
              upperBound = midPoint - 1
-        } else if classList[midPoint] == searchValue {
+        } else if classList[midPoint].TotalResourcesUtilization == searchValue {
             return midPoint
         }
     }
 }
 
 //for LEE and DEE regions, since they are ordered by descending order the sort above must be reversed
-func ReverseSort(classList []Task, searchValue string)(int) {
-listLength := len(classList)
+func ReverseSort(classList []*Host, searchValue string)(int) {
+	listLength := len(classList)
     lowerBound := 0
     upperBound := listLength- 1
 
     for {
         midPoint := (upperBound + lowerBound)/2
 
-        fmt.Println(midPoint)
-        if lowerBound > upperBound && classList[midPoint] < searchValue {
+        if lowerBound > upperBound && classList[midPoint].TotalResourcesUtilization < searchValue {
             return midPoint 
         } else if lowerBound > upperBound {
             return midPoint + 1
         }
 
-        if classList[midPoint] > searchValue {
+        if classList[midPoint].TotalResourcesUtilization > searchValue {
             lowerBound = midPoint + 1
-        } else if classList[midPoint] < searchValue {
+        } else if classList[midPoint].TotalResourcesUtilization < searchValue {
              upperBound = midPoint - 1
-        } else if classList[midPoint] == searchValue {
+        } else if classList[midPoint].TotalResourcesUtilization == searchValue {
             return midPoint
         }
     }
@@ -170,14 +150,13 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region
 	hosts = append(hosts, host)
-	regionLEEHosts.Class1Hosts = append(regionLEEHosts.Class1Hosts, &hosts[len(hosts)-1])	
-	fmt.Println(regionLEEHosts.Class1Hosts)	
+	
+	newHost := make([]*Host,0)
+	newHost = append(newHost, &hosts[len(hosts)-1])
 
-	for i := 0; i < len(regionLEEHosts.Class1Hosts); i++ {
-		if regionLEEHosts.Class1Hosts[i].HostID == "1" {
-		fmt.Println(*regionLEEHosts.Class1Hosts[i])
-		}
-	}
+	regions["LEE"].classHosts["1"] = append(regions["LEE"].classHosts["1"],newHost...)
+
+	fmt.Println(regions["LEE"].classHosts["1"])	
 }
 
 //function used to associate a worker to a host when the worker is created
@@ -216,182 +195,42 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 		if host.HostID == hostID && host.HostClass < newHostClass { //we only update the host class if the current class is lower
 			hosts[index].HostClass = newHostClass
 			//we need to update the list where this host is at
-			UpdateHostList(host.HostClass, newHostClass, hostID, host.Region)
+			UpdateHostList(host.HostClass, newHostClass, &hosts[index])
 		}
 		lockHosts.Unlock()
 		return
 	}
 }
 
-func InsertHost(classHosts []*Host, index int) ([]Task) {
-        tmp := make([]int, 0)
-         if index >= len(classHosts) {
+func InsertHost(classHosts []*Host, index int, host *Host) ([]*Host) {
+	tmp := make([]*Host, 0)
+    if index >= len(classHosts) { //if this is true then we put at end
         tmp = append(tmp, classHosts...)
-        tmp = append(tmp, value)
-    } else {
+        tmp = append(tmp, host)
+    } else { //the code below is to insert into the index positin
         tmp = append(tmp, classHosts[:index]...)
-        tmp = append(tmp, value)
+        tmp = append(tmp, host)
         tmp = append(tmp, classHosts[index:]...)
     }
-        return tmp
+    return tmp
 }
 
 
 //this function needs to remove the host from its previous class and update it to the new 
-func UpdateHostList(hostPreviousClass string, hostNewClass string, hostID string, hostRegion string, hostResources string) {
-	if hostRegion == "LEE" {
-		 if hostPreviousClass == "2" {
-			for i := 0 ; i < len(regionLEEHosts.class2Hosts); i++ {
-				if regionLEEHosts.class2Hosts[i].HostID == hostID {
-					regionLEEHosts.class2Hosts = append(regionLEEHosts.class2Hosts[:i], regionLEEHosts.class2Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
-						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "3" {
-			for i := 0 ; i < len(regionLEEHosts.class3Hosts); i++ {
-				if regionLEEHosts.class3Hosts[i].HostID == hostID {
-					regionLEEHosts.class3Hosts = append(regionLEEHosts.class3Hosts[:i], regionLEEHosts.class3Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionLEEHosts.class1Hosts, hostResources)
-						regionLEEHosts.class1Hosts = InsertHost(regionLEEHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
-						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "4" {
-			for i := 0 ; i < len(regionLEEHosts.class3Hosts); i++ {
-				if regionLEEHosts.class4Hosts[i].HostID == hostID {
-					regionLEEHosts.class4Hosts = append(regionLEEHosts.class4Hosts[:i], regionLEEHosts.class4Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionLEEHosts.class1Hosts, hostResources)
-						regionLEEHosts.class1Hosts = InsertHost(regionLEEHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
-						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
-					} 
-					} else if hostNewClass == "3" {
-						index := ReverseSort(regionLEEHosts.class3Hosts, hostResources)
-						regionLEEHosts.class3Hosts = InsertHost(regionLEEHosts.class3Hosts, index)		
-					} 
-					return
-				}
-			}
-
+func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
+	//this deletes
+	for i := 0 ; i < len(regions[host.Region].classHosts[hostPreviousClass]); i++ {
+		if 	regions[host.Region].classHosts[hostPreviousClass][i].HostID == host.HostID {
+			regions[host.Region].classHosts[hostPreviousClass] = append(regions[host.Region].classHosts[hostPreviousClass][:i], 	regions[host.Region].classHosts[hostPreviousClass][i+1:]...)
 		}
-	} else if hostRegion == "DEE" {
-		 if hostPreviousClass == "2" {
-			for i := 0 ; i < len(regionDEEHosts.class2Hosts); i++ {
-				if regionDEEHosts.class2Hosts[i].HostID == hostID {
-					regionDEEHosts.class2Hosts = append(regionDEEHosts.class2Hosts[:i], regionDEEHosts.class2Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
-						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "3" {
-			for i := 0 ; i < len(regionDEEHosts.class3Hosts); i++ {
-				if regionDEEHosts.class3Hosts[i].HostID == hostID {
-					regionDEEHosts.class3Hosts = append(regionDEEHosts.class3Hosts[:i], regionDEEHosts.class3Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionDEEHosts.class1Hosts, hostResources)
-						regionDEEHosts.class1Hosts = InsertHost(regionDEEHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
-						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "4" {
-			for i := 0 ; i < len(regionDEEHosts.class3Hosts); i++ {
-				if regionDEEHosts.class4Hosts[i].HostID == hostID {
-					regionDEEHosts.class4Hosts = append(regionDEEHosts.class4Hosts[:i], regionDEEHosts.class4Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := ReverseSort(regionDEEHosts.class1Hosts, hostResources)
-						regionDEEHosts.class1Hosts = InsertHost(regionDEEHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
-						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
-					} 
-					} else if hostNewClass == "3" {
-						index := ReverseSort(regionDEEHosts.class3Hosts, hostResources)
-						regionDEEHosts.class3Hosts = InsertHost(regionDEEHosts.class3Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		}
-	} else if hostRegion == "EED" {
-		 if hostPreviousClass == "2" {
-			for i := 0 ; i < len(regionEEDHosts.class2Hosts); i++ {
-				if regionEEDHosts.class2Hosts[i].HostID == hostID {
-					regionEEDHosts.class2Hosts = append(regionEEDHosts.class2Hosts[:i], regionEEDHosts.class2Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := Sort(regionEEDHosts.class2Hosts, hostResources)
-						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "3" {
-			for i := 0 ; i < len(regionEEDHosts.class3Hosts); i++ {
-				if regionEEDHosts.class3Hosts[i].HostID == hostID {
-					regionEEDHosts.class3Hosts = append(regionEEDHosts.class3Hosts[:i], regionEEDHosts.class3Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := Sort(regionEEDHosts.class1Hosts, hostResources)
-						regionEEDHosts.class1Hosts = InsertHost(regionEEDHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := ReverseSort(regionEEDHosts.class2Hosts, hostResources)
-						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		} else if hostPreviousClass == "4" {
-			for i := 0 ; i < len(regionEEDHosts.class3Hosts); i++ {
-				if regionEEDHosts.class4Hosts[i].HostID == hostID {
-					regionEEDHosts.class4Hosts = append(regionEEDHosts.class4Hosts[:i], regionEEDHosts.class4Hosts[i+1:]...) //eliminates host from list
-					
-					 if hostNewClass == "1" {
-						index := Sort(regionEEDHosts.class1Hosts, hostResources)
-						regionEEDHosts.class1Hosts = InsertHost(regionEEDHosts.class1Hosts, index)		
-					} else if hostNewClass == "2" {
-						index := Sort(regionEEDHosts.class2Hosts, hostResources)
-						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
-					} 
-					} else if hostNewClass == "3" {
-						index := Sort(regionEEDHosts.class3Hosts, hostResources)
-						regionEEDHosts.class3Hosts = InsertHost(regionEEDHosts.class3Hosts, index)		
-					} 
-					return
-				}
-			}
-
-		}
+	}
+	//this inserts in new list
+	if host.Region == "LEE" || host.Region == "DEE" {
+		index := ReverseSort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
+		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
+	} else {
+		index := ReverseSort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
+		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
 	}
 }
 
@@ -402,10 +241,30 @@ func UpdateHostRegion(hostID string, newRegion string) {
 		if host.HostID == hostID {
 			lockHosts.Lock()
 			hosts[index].Region = newRegion
+			UpdateHostRegionList(host.Region, newRegion, &hosts[index])
 			lockHosts.Unlock()
 			return 
 		}
 	}
+}
+
+//first we must remove the host from the previous region then insert it in the new onw
+func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
+	//this deletes
+	for i := 0 ; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
+		if 	regions[oldRegion].classHosts[host.HostClass][i].HostID == host.HostID {
+			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
+		}
+	}
+	//this inserts in new list
+	if newRegion  == "LEE" || host.Region == "DEE" {
+		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
+		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
+	} else {
+		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
+		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
+	}
+
 }
 
 
@@ -456,21 +315,20 @@ func GetHostsLEE_normal(requestClass string) ([]*Host) {
 	listHosts := make([]*Host,0)
 	
 	if requestClass == "1" {
-		listHosts = append(listHosts, regionLEEHosts.Class1Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
 	} else if requestClass == "2" {
-		listHosts = append(listHosts, regionLEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class2Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
 	} else if requestClass == "3" {
-		listHosts = append(listHosts, regionLEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class3Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
 	} else if requestClass == "4" {
-		listHosts = append(listHosts, regionLEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 	}
-	
 	return listHosts
 }
 
@@ -480,24 +338,25 @@ func GetHostsLEE_cut(requestClass string) ([]*Host) {
 	//class 1 hosts are always selected
 
 	listHosts := make([]*Host,0)
-	
+
 	if requestClass == "1" {
-		listHosts = append(listHosts, regionLEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 	} else if requestClass == "2" {
-		listHosts = append(listHosts, regionLEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
+
 	} else if requestClass == "3" {
-		listHosts = append(listHosts, regionLEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionLEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 	} else if requestClass == "4" {
-		listHosts = append(listHosts, regionLEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 	}
-	
-	return listHosts
+
+	return listHosts	
 }
 
 //for initial scheduling algori
@@ -507,19 +366,19 @@ func GetHostsDEE_normal(requestClass string) ([]*Host) {
 	listHosts := make([]*Host,0)
 	
 	if requestClass == "1" {
-		listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
 	} else if requestClass == "2" {
-		listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
 	} else if requestClass == "3" {
-		listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
 	} else if requestClass == "4" {
-		listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
 	}
 
 	return listHosts
@@ -530,23 +389,23 @@ func GetHostsDEE_cut(requestClass string) ([]*Host) {
 	//we only get hosts that respect requestClass <= hostClass and order them by ascending order of their class 
 	//class 1 hosts are always selected
 	listHosts := make([]*Host,0)
-	
 	if requestClass == "1" {
-		listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
 	} else if requestClass == "2" {
-		listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
+
 	} else if requestClass == "3" {
-		listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-		listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
 	} else if requestClass == "4" {
-		listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
 	}
-	
+
 	return listHosts
 	
 }
@@ -557,28 +416,28 @@ func GetHostsDEE_kill(requestClass string) ([]*Host) {
 
 	switch requestClass {
 		case "1":
-			listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
 			break
 		case "2":
-			listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
 			break
 		case "3":
-			listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
 			break
 		case "4":
-			listHosts = append(listHosts, regionDEEHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionDEEHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
 			break
 	}
 	return listHosts
@@ -586,31 +445,31 @@ func GetHostsDEE_kill(requestClass string) ([]*Host) {
 
 func GetHostsEED(requestClass string) ([]*Host) {
 	listHosts := make([]*Host,0)
-	
+
 	switch requestClass {
 		case "1":
-			listHosts = append(listHosts, regionEEDHosts.Class1Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class4Hosts...)
+			listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
 			break
 		case "2":
-			listHosts = append(listHosts, regionEEDHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
 			break
 		case "3":
-			listHosts = append(listHosts, regionEEDHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
 			break
 		case "4":
-			listHosts = append(listHosts, regionEEDHosts.Class4Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class3Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class2Hosts...)
-			listHosts = append(listHosts, regionEEDHosts.Class1Hosts...)
+			listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
+			listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
 			break
 	}
 	return listHosts
@@ -642,28 +501,58 @@ func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 }
 */
 func main() {
-	ServeSchedulerRequests()
+	regions = make(map[string]Region)	
 
+	ServeSchedulerRequests()
 }
 
 
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
-	hosts = append(hosts, Host{HostID: "1", HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
+	hosts = append(hosts, Host{HostID: "0", HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
 	hosts = append(hosts, Host{HostID: "2", HostClass: "2", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "3", HostClass: "3", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "4", HostClass: "4", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "5", HostClass: "2", Region:"DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "7", HostClass: "1", Region:"EED", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "8", HostClass: "1", Region:"DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
-		
-	regionLEEHosts.Class1Hosts = append(regionLEEHosts.Class1Hosts, &hosts[0])	
-	regionLEEHosts.Class2Hosts = append(regionLEEHosts.Class2Hosts,	&hosts[1])
-	regionLEEHosts.Class3Hosts = append(regionLEEHosts.Class3Hosts, &hosts[2])
-	regionLEEHosts.Class4Hosts = append(regionLEEHosts.Class4Hosts, &hosts[3])
-	regionDEEHosts.Class2Hosts = append(regionDEEHosts.Class2Hosts, &hosts[4])
-	regionEEDHosts.Class1Hosts = append(regionEEDHosts.Class1Hosts, &hosts[5])
-	regionDEEHosts.Class1Hosts = append(regionDEEHosts.Class1Hosts, &hosts[6])
+	hosts = append(hosts, Host{HostID: "1", HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
+
+	classLEE := make(map[string][]*Host)
+	classDEE := make(map[string][]*Host)
+	classEED := make(map[string][]*Host)
+
+	list1LEE := make([]*Host,0)
+	list1DEE := make([]*Host,0)
+	list1EED := make([]*Host,0)
+	list2LEE := make([]*Host,0)
+	list2DEE := make([]*Host,0)
+	list3 := make([]*Host,0)
+	list4 := make([]*Host,0)
+
+	list1LEE = append(list1LEE, &hosts[0])
+	list2LEE = append(list2LEE, &hosts[1])
+	list3 = append(list3, &hosts[2])
+	list4 = append(list4, &hosts[3])
+	list2DEE = append(list2DEE, &hosts[4])
+	list1EED = append(list1EED, &hosts[5])
+	list1DEE = append(list1DEE, &hosts[6])
+	list1LEE = append(list1LEE, &hosts[7])
+
+	
+	classLEE["1"] = list1LEE
+	classLEE["2"] = list2LEE
+	classLEE["3"] = list3
+	classLEE["4"] = list4
+	classDEE["1"] = list1DEE
+	classDEE["2"] = list2DEE
+	classEED["1"] = list1EED
+
+	regions["LEE"] = Region{classLEE}
+	regions["DEE"] = Region{classDEE}
+	regions["EED"] = Region{classEED}
+
+	fmt.Println(regions)
 
 //	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}",GetListHostsLEE_DEE).Methods("GET")
