@@ -63,6 +63,58 @@ var lockRegionDEE = &sync.Mutex{}
 var lockRegionEED = &sync.Mutex{}
 var lockHosts = &sync.Mutex{}
 
+//adapted binary search algorithm for inserting orderly based on total resources of a host
+//this is ascending order (for EED region)
+func Sort(classList []Task, searchValue string)(int) {
+    listLength := len(classList)
+    lowerBound := 0
+    upperBound := listLength- 1
+
+    for {
+        midPoint := (upperBound + lowerBound)/2
+
+        fmt.Println(midPoint)
+        if lowerBound > upperBound && classList[midPoint] > searchValue {
+            return midPoint 
+        } else if lowerBound > upperBound {
+            return midPoint + 1
+        }
+
+        if classList[midPoint] < searchValue {
+            lowerBound = midPoint + 1
+        } else if classList[midPoint] > searchValue {
+             upperBound = midPoint - 1
+        } else if classList[midPoint] == searchValue {
+            return midPoint
+        }
+    }
+}
+
+//for LEE and DEE regions, since they are ordered by descending order the sort above must be reversed
+func ReverseSort(classList []Task, searchValue string)(int) {
+listLength := len(classList)
+    lowerBound := 0
+    upperBound := listLength- 1
+
+    for {
+        midPoint := (upperBound + lowerBound)/2
+
+        fmt.Println(midPoint)
+        if lowerBound > upperBound && classList[midPoint] < searchValue {
+            return midPoint 
+        } else if lowerBound > upperBound {
+            return midPoint + 1
+        }
+
+        if classList[midPoint] > searchValue {
+            lowerBound = midPoint + 1
+        } else if classList[midPoint] < searchValue {
+             upperBound = midPoint - 1
+        } else if classList[midPoint] == searchValue {
+            return midPoint
+        }
+    }
+}
 
 func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
@@ -70,7 +122,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	memory := params["memory"]
 	requestClass := params["requestclass"]
 	image := params["image"]
-
 	
 	cmd := "docker"
     args := []string{"run","-itd", "-c", cpu,"-m",memory, "-e", "affinity:requestclass=="+requestClass, "--name", "lala1", image}
@@ -79,7 +130,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
         fmt.Println("Error using docker run")
         fmt.Println(err)
     }
-
 }
 
 func KillTasks(w http.ResponseWriter, req *http.Request) {
@@ -93,12 +143,10 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
         fmt.Println("Error using docker update")
         fmt.Println(err)
     }
-
 }
 
 //function responsible to update task resources when there's a cut
 func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
-
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	newCPU := params["newcpu"]
@@ -114,9 +162,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
         fmt.Println("Error using docker update")
         fmt.Println(err)
     }
-
 }
-
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
 	var host Host
@@ -132,9 +178,6 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 		fmt.Println(*regionLEEHosts.Class1Hosts[i])
 		}
 	}
-	/*for _, hostB := *regionLEEHosts.Class1Hosts {
-		fmt.Println(hostB)
-	} */
 }
 
 //function used to associate a worker to a host when the worker is created
@@ -162,6 +205,7 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	
 
 //function used to update host class when a new task arrives
+//implies list change
 func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	newHostClass := params["requestclass"]
@@ -171,14 +215,189 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 		lockHosts.Lock()
 		if host.HostID == hostID && host.HostClass < newHostClass { //we only update the host class if the current class is lower
 			hosts[index].HostClass = newHostClass
+			//we need to update the list where this host is at
+			UpdateHostList(host.HostClass, newHostClass, hostID, host.Region)
 		}
 		lockHosts.Unlock()
 		return
 	}
 }
 
-func UpdateHostRegion(hostID string, newRegion string) {
+func InsertHost(classHosts []*Host, index int) ([]Task) {
+        tmp := make([]int, 0)
+         if index >= len(classHosts) {
+        tmp = append(tmp, classHosts...)
+        tmp = append(tmp, value)
+    } else {
+        tmp = append(tmp, classHosts[:index]...)
+        tmp = append(tmp, value)
+        tmp = append(tmp, classHosts[index:]...)
+    }
+        return tmp
+}
 
+
+//this function needs to remove the host from its previous class and update it to the new 
+func UpdateHostList(hostPreviousClass string, hostNewClass string, hostID string, hostRegion string, hostResources string) {
+	if hostRegion == "LEE" {
+		 if hostPreviousClass == "2" {
+			for i := 0 ; i < len(regionLEEHosts.class2Hosts); i++ {
+				if regionLEEHosts.class2Hosts[i].HostID == hostID {
+					regionLEEHosts.class2Hosts = append(regionLEEHosts.class2Hosts[:i], regionLEEHosts.class2Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
+						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "3" {
+			for i := 0 ; i < len(regionLEEHosts.class3Hosts); i++ {
+				if regionLEEHosts.class3Hosts[i].HostID == hostID {
+					regionLEEHosts.class3Hosts = append(regionLEEHosts.class3Hosts[:i], regionLEEHosts.class3Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionLEEHosts.class1Hosts, hostResources)
+						regionLEEHosts.class1Hosts = InsertHost(regionLEEHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
+						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "4" {
+			for i := 0 ; i < len(regionLEEHosts.class3Hosts); i++ {
+				if regionLEEHosts.class4Hosts[i].HostID == hostID {
+					regionLEEHosts.class4Hosts = append(regionLEEHosts.class4Hosts[:i], regionLEEHosts.class4Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionLEEHosts.class1Hosts, hostResources)
+						regionLEEHosts.class1Hosts = InsertHost(regionLEEHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := ReverseSort(regionLEEHosts.class2Hosts, hostResources)
+						regionLEEHosts.class2Hosts = InsertHost(regionLEEHosts.class2Hosts, index)		
+					} 
+					} else if hostNewClass == "3" {
+						index := ReverseSort(regionLEEHosts.class3Hosts, hostResources)
+						regionLEEHosts.class3Hosts = InsertHost(regionLEEHosts.class3Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		}
+	} else if hostRegion == "DEE" {
+		 if hostPreviousClass == "2" {
+			for i := 0 ; i < len(regionDEEHosts.class2Hosts); i++ {
+				if regionDEEHosts.class2Hosts[i].HostID == hostID {
+					regionDEEHosts.class2Hosts = append(regionDEEHosts.class2Hosts[:i], regionDEEHosts.class2Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
+						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "3" {
+			for i := 0 ; i < len(regionDEEHosts.class3Hosts); i++ {
+				if regionDEEHosts.class3Hosts[i].HostID == hostID {
+					regionDEEHosts.class3Hosts = append(regionDEEHosts.class3Hosts[:i], regionDEEHosts.class3Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionDEEHosts.class1Hosts, hostResources)
+						regionDEEHosts.class1Hosts = InsertHost(regionDEEHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
+						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "4" {
+			for i := 0 ; i < len(regionDEEHosts.class3Hosts); i++ {
+				if regionDEEHosts.class4Hosts[i].HostID == hostID {
+					regionDEEHosts.class4Hosts = append(regionDEEHosts.class4Hosts[:i], regionDEEHosts.class4Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := ReverseSort(regionDEEHosts.class1Hosts, hostResources)
+						regionDEEHosts.class1Hosts = InsertHost(regionDEEHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := ReverseSort(regionDEEHosts.class2Hosts, hostResources)
+						regionDEEHosts.class2Hosts = InsertHost(regionDEEHosts.class2Hosts, index)		
+					} 
+					} else if hostNewClass == "3" {
+						index := ReverseSort(regionDEEHosts.class3Hosts, hostResources)
+						regionDEEHosts.class3Hosts = InsertHost(regionDEEHosts.class3Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		}
+	} else if hostRegion == "EED" {
+		 if hostPreviousClass == "2" {
+			for i := 0 ; i < len(regionEEDHosts.class2Hosts); i++ {
+				if regionEEDHosts.class2Hosts[i].HostID == hostID {
+					regionEEDHosts.class2Hosts = append(regionEEDHosts.class2Hosts[:i], regionEEDHosts.class2Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := Sort(regionEEDHosts.class2Hosts, hostResources)
+						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "3" {
+			for i := 0 ; i < len(regionEEDHosts.class3Hosts); i++ {
+				if regionEEDHosts.class3Hosts[i].HostID == hostID {
+					regionEEDHosts.class3Hosts = append(regionEEDHosts.class3Hosts[:i], regionEEDHosts.class3Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := Sort(regionEEDHosts.class1Hosts, hostResources)
+						regionEEDHosts.class1Hosts = InsertHost(regionEEDHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := ReverseSort(regionEEDHosts.class2Hosts, hostResources)
+						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		} else if hostPreviousClass == "4" {
+			for i := 0 ; i < len(regionEEDHosts.class3Hosts); i++ {
+				if regionEEDHosts.class4Hosts[i].HostID == hostID {
+					regionEEDHosts.class4Hosts = append(regionEEDHosts.class4Hosts[:i], regionEEDHosts.class4Hosts[i+1:]...) //eliminates host from list
+					
+					 if hostNewClass == "1" {
+						index := Sort(regionEEDHosts.class1Hosts, hostResources)
+						regionEEDHosts.class1Hosts = InsertHost(regionEEDHosts.class1Hosts, index)		
+					} else if hostNewClass == "2" {
+						index := Sort(regionEEDHosts.class2Hosts, hostResources)
+						regionEEDHosts.class2Hosts = InsertHost(regionEEDHosts.class2Hosts, index)		
+					} 
+					} else if hostNewClass == "3" {
+						index := Sort(regionEEDHosts.class3Hosts, hostResources)
+						regionEEDHosts.class3Hosts = InsertHost(regionEEDHosts.class3Hosts, index)		
+					} 
+					return
+				}
+			}
+
+		}
+	}
+}
+
+
+//implies list change
+func UpdateHostRegion(hostID string, newRegion string) {
 	for index, host := range hosts {
 		if host.HostID == hostID {
 			lockHosts.Lock()
@@ -187,7 +406,6 @@ func UpdateHostRegion(hostID string, newRegion string) {
 			return 
 		}
 	}
-
 }
 
 
