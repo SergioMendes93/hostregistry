@@ -34,7 +34,6 @@ type Region struct {
 	classHosts map[string][]*Host
 }
 
-
 var regions map[string]Region
 
 var hosts []Host
@@ -189,16 +188,14 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	newHostClass := params["requestclass"]
 	hostID := params["hostid"]
-
+	
 	for index, host := range hosts {
-		lockHosts.Lock()
-		if host.HostID == hostID && host.HostClass < newHostClass { //we only update the host class if the current class is lower
+		if host.HostID == hostID && host.HostClass > newHostClass { //we only update the host class if the current class is higher
 			hosts[index].HostClass = newHostClass
 			//we need to update the list where this host is at
 			UpdateHostList(host.HostClass, newHostClass, &hosts[index])
+			return
 		}
-		lockHosts.Unlock()
-		return
 	}
 }
 
@@ -221,7 +218,7 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 	//this deletes
 	for i := 0 ; i < len(regions[host.Region].classHosts[hostPreviousClass]); i++ {
 		if 	regions[host.Region].classHosts[hostPreviousClass][i].HostID == host.HostID {
-			regions[host.Region].classHosts[hostPreviousClass] = append(regions[host.Region].classHosts[hostPreviousClass][:i], 	regions[host.Region].classHosts[hostPreviousClass][i+1:]...)
+			regions[host.Region].classHosts[hostPreviousClass] = append(regions[host.Region].classHosts[hostPreviousClass][:i], regions[host.Region].classHosts[hostPreviousClass][i+1:]...)
 		}
 	}
 	//this inserts in new list
@@ -516,7 +513,7 @@ func ServeSchedulerRequests() {
 	hosts = append(hosts, Host{HostID: "5", HostClass: "2", Region:"DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "7", HostClass: "1", Region:"EED", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "8", HostClass: "1", Region:"DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
-	hosts = append(hosts, Host{HostID: "1", HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
+	hosts = append(hosts, Host{HostID: "1", HostClass: "2", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
 
 	classLEE := make(map[string][]*Host)
 	classDEE := make(map[string][]*Host)
@@ -537,7 +534,7 @@ func ServeSchedulerRequests() {
 	list2DEE = append(list2DEE, &hosts[4])
 	list1EED = append(list1EED, &hosts[5])
 	list1DEE = append(list1DEE, &hosts[6])
-	list1LEE = append(list1LEE, &hosts[7])
+	list2LEE = append(list2LEE, &hosts[7])
 
 	
 	classLEE["1"] = list1LEE
@@ -552,7 +549,6 @@ func ServeSchedulerRequests() {
 	regions["DEE"] = Region{classDEE}
 	regions["EED"] = Region{classEED}
 
-	fmt.Println(regions)
 
 //	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}",GetListHostsLEE_DEE).Methods("GET")
