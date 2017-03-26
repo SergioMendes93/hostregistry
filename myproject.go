@@ -174,13 +174,18 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 			//TODO: por return aqui
 		}
 	}*/ 
-
 	//PARA UMA FASE DE TESTES
-	for index, _ := range hosts {
-		lockHosts.Lock()
+	for index, _ := range hosts {		
+			//Temporary to avoid several workers from being added
+		for _, existingWorkerID := range hosts[index].WorkerNodesID {
+			if existingWorkerID == workerID {
+				return
+			}
+		}
+		
 		hosts[index].WorkerNodesID = append(hosts[index].WorkerNodesID, workerID) 
-		lockHosts.Unlock()
 	}
+	
 }
 	
 
@@ -489,6 +494,7 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 			hosts[index].CPU_Utilization = cpuUpdate
 			hosts[index].MemoryUtilization = memoryUpdate
 			//TODO (tambem nos outros dois updates). update nas total resources e ver se é preciso fazer update na region 
+			//check if total  resources should be updated, if yes then also check if region should be updated
 		}	
 	}
 	fmt.Println(hosts)
