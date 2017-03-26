@@ -10,16 +10,18 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 	"os/exec"
 	"time"
+	"net"
 )
 type Host struct {
         HostID      string              	`json:"hostid,omitempty"`
+		HostIP		string					`json:"hostip, omitempty"`
         WorkerNodesID []string          	`json:"workernodesid,omitempty"`
         WorkerNodes []*node.Node			`json:"workernodes,omitempty"`
 		HostClass   string              	`json:"hostclass,omitempty"`
         Region      string              	`json:"region,omitempty"`
         TotalResourcesUtilization string   	`json:"totalresouces,omitempty"`
-        CPU_Utilization int            		`json:"cpu,omitempty"`
-        MemoryUtilization int          		`json:"memory,omitempty"`
+        CPU_Utilization string            	`json:"cpu,omitempty"`
+        MemoryUtilization string          	`json:"memory,omitempty"`
 		AvailableMemory int64				`json:"availablememory,omitempty"`
 		AvailableCPUs int64					`json:"availablecpus,omitempty"`
         AllocatedResources int        	    `json:"resoucesallocated,omitempty"`
@@ -472,10 +474,59 @@ func GetHostsEED(requestClass string) ([]*Host) {
 	return listHosts
 }
 
+//updates both memory and cpu. message received from energy monitors
+func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
+	//the host is going to be identified by the IP
+	fmt.Println("Updating both")
+
+	params := mux.Vars(req)
+	hostIP := params["hostip"]
+	cpuUpdate := params["cpu"]
+	memoryUpdate := params["memory"]
+
+	for index, host := range hosts {
+		if hostIP == host.HostIP {
+			hosts[index].CPU_Utilization = cpuUpdate
+			hosts[index].MemoryUtilization = memoryUpdate
+			//TODO (tambem nos outros dois updates). update nas total resources e ver se é preciso fazer update na region 
+		}	
+	}
+	fmt.Println(hosts)
+}
+
+func UpdateCPU(w http.ResponseWriter, req *http.Request) {
+	params := mux.Vars(req)
+	hostIP := params["hostip"]
+	cpuUpdate := params["cpu"]
+
+	fmt.Println(hostIP)	
+	fmt.Println("Updating cpu " + cpuUpdate)
+
+	for index, host := range hosts {
+		if hostIP == host.HostIP {
+			hosts[index].CPU_Utilization = cpuUpdate
+		}	
+	}
+	fmt.Println(hosts)
+}
+
+func UpdateMemory(w http.ResponseWriter, req *http.Request) {
+	params := mux.Vars(req)
+	hostIP := params["hostip"]
+	memoryUpdate := params["memory"]
+
+	fmt.Println("Updating memory")
+
+	for index, host := range hosts {
+		if hostIP == host.HostIP {
+			hosts[index].MemoryUtilization = memoryUpdate
+		}	
+	}
+	fmt.Println(hosts)
+
+}
 
 
-//loosely sorted so that there's no big overhead in sorting
-//func sort
 
 /*
 func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -506,7 +557,7 @@ func main() {
 
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
-	hosts = append(hosts, Host{HostID: "0", HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
+	hosts = append(hosts, Host{HostID: "0", HostIP: "192.168.1.154",  HostClass: "1", Region:"LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000})
 	hosts = append(hosts, Host{HostID: "2", HostClass: "2", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "3", HostClass: "3", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
 	hosts = append(hosts, Host{HostID: "4", HostClass: "4", Region:"LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000})
@@ -559,12 +610,30 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}",UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
 	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
+	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
+	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
+	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
+	
 
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
 //	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
 	log.Fatal(http.ListenAndServe("192.168.1.154:12345", router))
-
 }
 
+func getIPAddress() (string) {
+	addrs, err := net.InterfaceAddrs()
+    if err != nil {
+		fmt.Println(err.Error())
+    }
+    for _, a := range addrs {
+    	if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+        	if ipnet.IP.To4() != nil {
+				fmt.Println(ipnet.IP.String())
+				return ipnet.IP.String()
+            }
+        }
+	}
+	return ""
+}
 
