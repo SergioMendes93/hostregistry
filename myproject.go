@@ -6,16 +6,36 @@ import (
 	"fmt"
 	"sync"
 	"net/http"
-	"github.com/gorilla/mux"
-	"github.com/docker/swarm/scheduler/node"
 	"os/exec"
 	"time"
 	"net"
+
+	"github.com/gorilla/mux"
+	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/scheduler/node"
 )
+
+// Node is an abstract type used by the scheduler.
+type Node struct {
+	ID         string
+	IP         string
+	Addr       string
+	Name       string
+	Labels     map[string]string
+	Containers cluster.Containers
+	Images     []*cluster.Image
+
+	UsedMemory  int64
+	UsedCpus    int64
+	TotalMemory int64
+	TotalCpus   int64
+
+	HealthIndicator int64
+}
+
 type Host struct {
         HostID      string              	`json:"hostid,omitempty"`
 		HostIP		string					`json:"hostip, omitempty"`
-        WorkerNodesID []string          	`json:"workernodesid,omitempty"`
         WorkerNodes []*node.Node			`json:"workernodes,omitempty"`
 		HostClass   string              	`json:"hostclass,omitempty"`
         Region      string              	`json:"region,omitempty"`
@@ -156,13 +176,11 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	newHost = append(newHost, &hosts[len(hosts)-1])
 
 	regions["LEE"].classHosts["1"] = append(regions["LEE"].classHosts["1"],newHost...)
-
-	fmt.Println(regions["LEE"].classHosts["1"])	
 }
 
 //function used to associate a worker to a host when the worker is created
 func AddWorker(w http.ResponseWriter, req *http.Request) {
-	params := mux.Vars(req)
+/*	params := mux.Vars(req)
 //	hostID := params["hostid"]
 	workerID := params["workerid"]
 /*
@@ -175,17 +193,21 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 		}
 	}*/ 
 	//PARA UMA FASE DE TESTES
+
+	var newWorker *node.Node
+	_ = json.NewDecoder(req.Body).Decode(&newWorker)
+	fmt.Println("Novo worker")
+	fmt.Println(newWorker)
+	
 	for index, _ := range hosts {		
 			//Temporary to avoid several workers from being added
-		for _, existingWorkerID := range hosts[index].WorkerNodesID {
-			if existingWorkerID == workerID {
+		for _, existingWorker := range hosts[index].WorkerNodes {
+			if existingWorker == newWorker {
 				return
 			}
-		}
-		
-		hosts[index].WorkerNodesID = append(hosts[index].WorkerNodesID, workerID) 
-	}
-	
+		}	
+		hosts[index].WorkerNodes = append(hosts[index].WorkerNodes, newWorker) 
+	}	
 }
 	
 
@@ -612,7 +634,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
 	router.HandleFunc("/host/createhost",CreateHost).Methods("POST")
-	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("GET")
+	router.HandleFunc("/host/addworker/{hostid}&{workerid}",AddWorker).Methods("POST")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}",UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
 	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
@@ -624,7 +646,7 @@ func ServeSchedulerRequests() {
 //	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 //	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
 //	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
-	log.Fatal(http.ListenAndServe("192.168.1.154:12345", router))
+	log.Fatal(http.ListenAndServe("192.168.1.168:12345", router))
 }
 
 func getIPAddress() (string) {
