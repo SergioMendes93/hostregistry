@@ -73,6 +73,10 @@ func Sort(classList []*Host, searchValue string) int {
 	lowerBound := 0
 	upperBound := listLength - 1
 
+	if listLength == 0 { //if the list is empty there is no need for sorting
+		return 0
+	}
+
 	for {
 		midPoint := (upperBound + lowerBound) / 2
 
@@ -98,8 +102,13 @@ func ReverseSort(classList []*Host, searchValue string) int {
 	lowerBound := 0
 	upperBound := listLength - 1
 
+	if listLength == 0 { //if the list is empty there is no need for sorting
+		return 0
+	}
+
 	for {
 		midPoint := (upperBound + lowerBound) / 2
+		
 
 		if lowerBound > upperBound && classList[midPoint].TotalResourcesUtilization < searchValue {
 			return midPoint
@@ -169,7 +178,6 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	var host Host
 	_ = json.NewDecoder(req.Body).Decode(&host)
 
-	fmt.Println("AQU")
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region
 	hosts[host.HostID] = &host
 	
@@ -197,8 +205,6 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 
 	var newWorker *node.Node
 	_ = json.NewDecoder(req.Body).Decode(&newWorker)
-	fmt.Println("Novo worker")
-	fmt.Println(newWorker)
 	addWorker := make([]*node.Node, 0)
 	addWorker = append(addWorker, newWorker)
 	
@@ -263,10 +269,8 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 
 //implies list change
 func UpdateHostRegion(hostID string, newRegion string) {
-	lockHosts.Lock()
 	hosts[hostID].Region = newRegion
 	UpdateHostRegionList(hosts[hostID].Region, newRegion, hosts[hostID])
-	lockHosts.Unlock()
 	return
 }
 
@@ -286,7 +290,6 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
 	}
-
 }
 
 //used by initial scheduling and cut algorithm
@@ -513,7 +516,6 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 			UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostID)
 		}
 	}
-	fmt.Println(hosts)
 }
 
 //function whose job is to check whether the total resources should be updated or not.
@@ -572,7 +574,6 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 	hostIP := params["hostip"]
 	cpuUpdate := params["cpu"]
 
-	fmt.Println(hostIP)
 	fmt.Println("Updating cpu " + cpuUpdate)
 
 	for hostID, host := range hosts {
@@ -581,7 +582,6 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 			UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostID)
 		}
 	}
-	fmt.Println(hosts)
 }
 
 //information received from monitor
@@ -598,8 +598,6 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 			UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostID)
 		}
 	}
-	fmt.Println(hosts)
-
 }
 
 //updates information about allocated resources and recalculates overbooking factor.
@@ -631,7 +629,7 @@ func main() {
 }
 
 func assignHosts(){
-	hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.168", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
+	hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.170", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
 	hosts["1"] = &Host{HostID: "2", HostClass: "2", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["2"] = &Host{HostID: "3", HostClass: "3", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["3"] = &Host{HostID: "4", HostClass: "4", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
