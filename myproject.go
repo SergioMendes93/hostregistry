@@ -606,6 +606,21 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 //this is information received from the Scheduler when it makes a scheduling decision
 func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Request) {
 	//é preciso host id, cpu e memoria do request 
+	params := mux.Vars(req)
+	hostID := params["hostid"]
+	newCPU := params["cpu"]
+	newMemory := params["memory"]
+
+	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
+	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
+
+	hosts[hostID].AllocatedCPUs += auxCPU
+	hosts[hostID].AllocatedMemory += auxMemory
+
+	cpuOverbooking := hosts[hostID].AllocatedCPUs / hosts[hostID].TotalCPUs
+	memoryOverbooking := hosts[hostID].AllocatedMemory / hosts[hostID].TotalMemory
+
+	hosts[hostID].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
 }
 
 func main() {
@@ -675,11 +690,12 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
+	router.HandleFunc("/host/updateresources/{hostid}&{cpu}&{memory}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
 
 	//	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 	//	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
 	//	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
-	log.Fatal(http.ListenAndServe("192.168.1.168:12345", router))
+	log.Fatal(http.ListenAndServe(getIPAddress()+":12345", router))
 }
 
 func getIPAddress() string {
