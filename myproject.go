@@ -101,7 +101,7 @@ func ReverseSort(classList []*Host, searchValue string) int {
 	listLength := len(classList)
 	lowerBound := 0
 	upperBound := listLength - 1
-
+		
 	if listLength == 0 { //if the list is empty there is no need for sorting
 		return 0
 	}
@@ -283,7 +283,7 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	}
 	//this inserts in new list
 	if newRegion == "LEE" || newRegion == "DEE" {
-		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
+		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)		
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
 	} else {
 		index := Sort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
@@ -519,36 +519,34 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 
 //function whose job is to check whether the total resources should be updated or not.
 func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, hostID string){
+	//this will be used in case there is no region change to avoid updating the host position in its current region if its total has not changed
+	previousTotalResourceUtilization := hosts[hostID].TotalResourcesUtilization
+	afterTotalResourceUtilization := ""
+
 	switch updateType {
 		case 1:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
 			newMemory, _ := strconv.ParseFloat(memory, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)		
+			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
 			break
 		case 2:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
 			memory,_ := strconv.ParseFloat(hosts[hostID].MemoryUtilization, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1,64)
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1, 64)		
+			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
 			break
 		case 3:
 			newMemory, _ := strconv.ParseFloat(memory, 64)
 			cpu,_ := strconv.ParseFloat(hosts[hostID].CPU_Utilization, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1,64)
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1, 64)		
+			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
 			break
 	}
 	//now we must check if the host region should be updated or not
-	if !CheckIfRegionUpdate(hostID) { //if an update to the host region is not required then we update this host position inside its region list
+	if !CheckIfRegionUpdate(hostID) && afterTotalResourceUtilization != previousTotalResourceUtilization { //if an update to the host region is not required then we update this host position inside its region list
 		hostRegion := hosts[hostID].Region
-		fmt.Println("Before inserting")
-		fmt.Println(regions[hostRegion].classHosts[hosts[hostID].HostClass])
-
-		UpdateHostList(hostRegion, hostRegion, hosts[hostID])
-		
- 		fmt.Println("After inserting")
-		fmt.Println(regions[hostRegion].classHosts[hosts[hostID].HostClass])
+		UpdateHostRegionList(hostRegion, hostRegion, hosts[hostID])		
 	}
 }
 
@@ -634,9 +632,9 @@ func main() {
 
 func assignHosts(){
 	hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.170", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
-	hosts["2"] = &Host{HostID: "2", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.3"}
-	hosts["3"] = &Host{HostID: "3", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.27"}
-	hosts["4"] = &Host{HostID: "4", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.19"}
+	hosts["2"] = &Host{HostID: "2", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.45"}
+	hosts["3"] = &Host{HostID: "3", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.37"}
+	hosts["4"] = &Host{HostID: "4", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.33"}
 	hosts["5"] = &Host{HostID: "5", HostClass: "2", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["7"] = &Host{HostID: "7", HostClass: "1", Region: "EED", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["8"] = &Host{HostID: "8", HostClass: "1", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
@@ -656,13 +654,17 @@ func ServeSchedulerRequests() {
 	list1EED := make([]*Host, 0)
 	list2LEE := make([]*Host, 0)
 	list2DEE := make([]*Host, 0)
-	list3 := make([]*Host, 0)
-	list4 := make([]*Host, 0)
+//	list3 := make([]*Host, 0)
+//	list4 := make([]*Host, 0)
 
+	list1LEE = append(list1LEE, hosts["2"])
+	list1LEE = append(list1LEE, hosts["3"])
+	list1LEE = append(list1LEE, hosts["4"])
 	list1LEE = append(list1LEE, hosts["0"])
-	list2LEE = append(list2LEE, hosts["1"])
-	list3 = append(list3, hosts["2"])
-	list4 = append(list4, hosts["3"])
+
+	//list2LEE = append(list2LEE, hosts["1"])
+	//list3 = append(list3, hosts["2"])
+	//list4 = append(list4, hosts["3"])
 	list2DEE = append(list2DEE, hosts["5"])
 	list1EED = append(list1EED, hosts["7"])
 	list1DEE = append(list1DEE, hosts["8"])
@@ -670,8 +672,8 @@ func ServeSchedulerRequests() {
 
 	classLEE["1"] = list1LEE
 	classLEE["2"] = list2LEE
-	classLEE["3"] = list3
-	classLEE["4"] = list4
+	//classLEE["3"] = list3
+	//classLEE["4"] = list4
 	classDEE["1"] = list1DEE
 	classDEE["2"] = list2DEE
 	classEED["1"] = list1EED
