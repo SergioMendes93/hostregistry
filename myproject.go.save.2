@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"sync"
 	"time"
-	"math"
-	"strconv"	
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -44,11 +42,11 @@ type Host struct {
 	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
 	CPU_Utilization           string       `json:"cpu,omitempty"`
 	MemoryUtilization         string       `json:"memory,omitempty"`
-	AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
-	AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
-	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
-	TotalMemory				  float64	   `json:"totalmemory,omitempty"`
-	TotalCPUs				  float64	   `json:"totalcpus, omitempty"`
+	AvailableMemory           int64        `json:"availablememory,omitempty"`
+	AvailableCPUs             int64        `json:"availablecpus,omitempty"`
+	AllocatedResources        int          `json:"resoucesallocated,omitempty"`
+	TotalHostResources        int          `json:"totalresources,omitempty"`
+	OverbookingFactor         int          `json:"overbookingfactor,omitempty"`
 }
 
 //Each region will have 4 lists, one for each overbooking class
@@ -169,10 +167,9 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	var host Host
 	_ = json.NewDecoder(req.Body).Decode(&host)
 
-	fmt.Println("AQU")
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region
 	hosts[host.HostID] = &host
-	
+
 	newHost := make([]*Host, 0)
 	newHost = append(newHost, hosts[host.HostID])
 
@@ -496,7 +493,7 @@ func GetHostsEED(requestClass string) []*Host {
 	return listHosts
 }
 
-//updates both memory and cpu. message received from energy monitors. 
+//updates both memory and cpu. message received from energy monitors
 func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 	//the host is going to be identified by the IP
 	fmt.Println("Updating both")
@@ -510,63 +507,13 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 		if hostIP == host.HostIP {
 			hosts[hostID].CPU_Utilization = cpuUpdate
 			hosts[hostID].MemoryUtilization = memoryUpdate
-			UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostID)
+			//TODO (tambem nos outros dois updates). update nas total resources e ver se é preciso fazer update na region
+			//check if total  resources should be updated, if yes then also check if region should be updated
 		}
 	}
 	fmt.Println(hosts)
 }
 
-//function whose job is to check whether the total resources should be updated or not.
-func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, hostID string){
-	switch updateType {
-		case 1:
-			newCPU,_ := strconv.ParseFloat(cpu,64)
-			newMemory, _ := strconv.ParseFloat(memory, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)
-
-			//now we must check if the host region should be updated or not
-			CheckIfRegionUpdate(hostID)
-			break
-		case 2:
-			newCPU,_ := strconv.ParseFloat(cpu,64)
-			memory,_ := strconv.ParseFloat(hosts[hostID].MemoryUtilization, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1,64)
-
-			//now we must check if the host region should be updated or not
-			CheckIfRegionUpdate(hostID)
-			break
-		case 3:
-			newMemory, _ := strconv.ParseFloat(memory, 64)
-			cpu,_ := strconv.ParseFloat(hosts[hostID].CPU_Utilization, 64)
-
-			hosts[hostID].TotalResourcesUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1,64)
-
-			//now we must check if the host region should be updated or not
-			CheckIfRegionUpdate(hostID)
-			break
-	}
-}
-
-func CheckIfRegionUpdate(hostID string) {
-	if hosts[hostID].TotalResourcesUtilization < "0.5" { //LEE region
-		if hosts[hostID].Region != "LEE" { //if this is true then we must update this host region because it changed
-			UpdateHostRegion(hostID, "LEE")
-		}
-	} else if hosts[hostID].TotalResourcesUtilization < "0.85" { //DEE region
-		if hosts[hostID].Region != "DEE" { //if this is true then we must update this host region because it changed
-			UpdateHostRegion(hostID, "DEE")
-		}
-	} else { //EED region
-		if hosts[hostID].Region != "EED" { //if this is true then we must update this host region because it changed
-			UpdateHostRegion(hostID, "EED")
-		}
-	}
-	return
-}
-
-//information received from monitor
 func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
@@ -578,13 +525,11 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 	for hostID, host := range hosts {
 		if hostIP == host.HostIP {
 			hosts[hostID].CPU_Utilization = cpuUpdate
-			UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostID)
 		}
 	}
 	fmt.Println(hosts)
 }
 
-//information received from monitor
 func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
@@ -595,17 +540,10 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	for hostID, host := range hosts {
 		if hostIP == host.HostIP {
 			hosts[hostID].MemoryUtilization = memoryUpdate
-			UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostID)
 		}
 	}
 	fmt.Println(hosts)
 
-}
-
-//updates information about allocated resources and recalculates overbooking factor.
-//this is information received from the Scheduler when it makes a scheduling decision
-func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Request) {
-	//é preciso host id, cpu e memoria do request 
 }
 
 func main() {
@@ -615,20 +553,16 @@ func main() {
 	ServeSchedulerRequests()
 }
 
-func assignHosts(){
-	hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.168", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
-	hosts["1"] = &Host{HostID: "2", HostClass: "2", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["2"] = &Host{HostID: "3", HostClass: "3", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["3"] = &Host{HostID: "4", HostClass: "4", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["5"] = &Host{HostID: "5", HostClass: "2", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["7"] = &Host{HostID: "7", HostClass: "1", Region: "EED", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["8"] = &Host{HostID: "8", HostClass: "1", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["1"] = &Host{HostID: "1", HostClass: "2", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
-}
-
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
-	assignHosts()
+	hosts["0"] = Host{HostID: "0", HostIP: "192.168.1.154", HostClass: "1", Region: "LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000}
+	hosts["1"] = Host{HostID: "2", HostClass: "2", Region: "LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["2"] = Host{HostID: "3", HostClass: "3", Region: "LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["3"] = Host{HostID: "4", HostClass: "4", Region: "LEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["5"] = Host{HostID: "5", HostClass: "2", Region: "DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["7"] = Host{HostID: "7", HostClass: "1", Region: "EED", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["8"] = Host{HostID: "8", HostClass: "1", Region: "DEE", AvailableMemory: 50000000000, AvailableCPUs: 50000000000}
+	hosts["1"] = Host{HostID: "1", HostClass: "2", Region: "LEE", AvailableMemory: 5000000, AvailableCPUs: 50000000}
 
 	classLEE := make(map[string][]*Host)
 	classDEE := make(map[string][]*Host)
@@ -642,14 +576,14 @@ func ServeSchedulerRequests() {
 	list3 := make([]*Host, 0)
 	list4 := make([]*Host, 0)
 
-	list1LEE = append(list1LEE, hosts["0"])
-	list2LEE = append(list2LEE, hosts["1"])
-	list3 = append(list3, hosts["2"])
-	list4 = append(list4, hosts["3"])
-	list2DEE = append(list2DEE, hosts["5"])
-	list1EED = append(list1EED, hosts["7"])
-	list1DEE = append(list1DEE, hosts["8"])
-	list2LEE = append(list2LEE, hosts["1"])
+	list1LEE = append(list1LEE, &hosts["0"])
+	list2LEE = append(list2LEE, &hosts["1"])
+	list3 = append(list3, &hosts["2"])
+	list4 = append(list4, &hosts["3"])
+	list2DEE = append(list2DEE, &hosts["5"])
+	list1EED = append(list1EED, &hosts["7"])
+	list1DEE = append(list1DEE, &hosts["8"])
+	list2LEE = append(list2LEE, &hosts["1"])
 
 	classLEE["1"] = list1LEE
 	classLEE["2"] = list2LEE
