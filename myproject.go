@@ -174,16 +174,31 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 }
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
-	var host Host
+
+/*	var host Host
 	_ = json.NewDecoder(req.Body).Decode(&host)
 
-	//since a host is created it will not have tasks assigned to it so it goes to the LEE region
+	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
 	hosts[host.HostID] = &host
+*/
+	params := mux.Vars(req)
+	hostID := params["hostid"]
+	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
+	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64)	
+	
+	fmt.Println("Creating host")
+
+	hosts[hostID] = &Host{HostID: hostID, HostIP: "192.168.1.170", HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs}
+
+
+	fmt.Println(hosts[hostID])
 	
 	newHost := make([]*Host, 0)
-	newHost = append(newHost, hosts[host.HostID])
+	newHost = append(newHost, hosts[hostID])
 
-	regions["LEE"].classHosts["1"] = append(regions["LEE"].classHosts["1"], newHost...)
+	regions["LEE"].classHosts["4"] = append(regions["LEE"].classHosts["4"], newHost...)
+	fmt.Println(regions["LEE"].classHosts["4"])
+
 }
 
 //function used to associate a worker to a host when the worker is created
@@ -611,6 +626,9 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
 
+	fmt.Println("received")
+	fmt.Println(newMemory)
+
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
@@ -686,7 +704,8 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/list/{requestclass}&{listtype}", GetListHostsLEE_DEE).Methods("GET")
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
-	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
+//	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
+	router.HandleFunc("/host/createhost/{hostid}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
 	router.HandleFunc("/host/addworker/{hostid}&{workerid}", AddWorker).Methods("POST")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}", UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
