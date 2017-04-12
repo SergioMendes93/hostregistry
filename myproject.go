@@ -36,9 +36,8 @@ type Node struct {
 }
 
 type Host struct {
-	HostID                    string       `json:"hostid,omitempty"`
 	HostIP                    string       `json:"hostip, omitempty"`
-	WorkerNode                *node.Node    `json:"workernode,omitempty"` //contains the reference used by the scheduler to identify the host
+	WorkerNode                *node.Node   `json:"workernode,omitempty"` //contains the reference used by the scheduler to identify the host
 	HostClass                 string       `json:"hostclass,omitempty"`
 	Region                    string       `json:"region,omitempty"`
 	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
@@ -185,15 +184,19 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	hosts[host.HostID] = &host
 */
 	params := mux.Vars(req)
-	hostID := params["hostid"]
+	hostIP := params["hostip"]
 	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64)	
 	
+	fmt.Println("Creating host")
+	fmt.Println(hostIP)
+
+
 	locks["LEE"].classHosts["4"].Lock()
-	hosts[hostID] = &Host{HostID: hostID, HostIP: "192.168.1.170", HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs}
+	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs}
 	
 	newHost := make([]*Host, 0)
-	newHost = append(newHost, hosts[hostID])
+	newHost = append(newHost, hosts[hostIP])
 	
 	regions["LEE"].classHosts["4"] = append(regions["LEE"].classHosts["4"], newHost...)
 	locks["LEE"].classHosts["4"].Unlock()
@@ -219,6 +222,9 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	var newWorker *node.Node
 	_ = json.NewDecoder(req.Body).Decode(&newWorker)
 
+	fmt.Println("Worker IP")
+	fmt.Println(newWorker.IP)
+
 	hosts[newWorker.ID].WorkerNode = newWorker	
 }
 
@@ -227,18 +233,18 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	newHostClass := params["requestclass"]
-	hostID := params["hostid"]
+	hostIP := params["hostip"]
 
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()
-	host := hosts[hostID]
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
+	host := hosts[hostIP]
 	if host.HostClass > newHostClass { //we only update the host class if the current class is higher
-		hosts[hostID].HostClass = newHostClass
+		hosts[hostIP].HostClass = newHostClass
 		//we need to update the list where this host is at
-		locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
-		UpdateHostList(host.HostClass, newHostClass, hosts[host.HostID])
+		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
+		UpdateHostList(host.HostClass, newHostClass, hosts[host.HostIP])
 		return
 	}
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 
 }
 
@@ -260,7 +266,7 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 	//this deletes
 	locks[host.Region].classHosts[hostPreviousClass].Lock()
 	for i := 0; i < len(regions[host.Region].classHosts[hostPreviousClass]); i++ {
-		if regions[host.Region].classHosts[hostPreviousClass][i].HostID == host.HostID {
+		if regions[host.Region].classHosts[hostPreviousClass][i].HostIP == host.HostIP {
 			regions[host.Region].classHosts[hostPreviousClass] = append(regions[host.Region].classHosts[hostPreviousClass][:i], regions[host.Region].classHosts[hostPreviousClass][i+1:]...)
 			break
 		}
@@ -282,12 +288,12 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 }
 
 //implies list change
-func UpdateHostRegion(hostID string, newRegion string) {
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()
-	hosts[hostID].Region = newRegion
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
+func UpdateHostRegion(hostIP string, newRegion string) {
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
+	hosts[hostIP].Region = newRegion
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 
-	UpdateHostRegionList(hosts[hostID].Region, newRegion, hosts[hostID])
+	UpdateHostRegionList(hosts[hostIP].Region, newRegion, hosts[hostIP])
 	return
 }
 
@@ -296,7 +302,7 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	//this deletes
 	locks[oldRegion].classHosts[host.HostClass].Lock()
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
-		if regions[oldRegion].classHosts[host.HostClass][i].HostID == host.HostID {
+		if regions[oldRegion].classHosts[host.HostClass][i].HostIP == host.HostIP {
 			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
 			break
 		}
@@ -892,19 +898,19 @@ func main() {
 }
 
 func assignHosts(){
-	hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.170", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
+	/*hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.170", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
 	hosts["2"] = &Host{HostID: "2", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.45"}
 	hosts["3"] = &Host{HostID: "3", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.37"}
 	hosts["4"] = &Host{HostID: "4", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.33"}
 	hosts["5"] = &Host{HostID: "5", HostClass: "2", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["7"] = &Host{HostID: "7", HostClass: "1", Region: "EED", TotalMemory: 50000000000, TotalCPUs: 50000000000}
 	hosts["8"] = &Host{HostID: "8", HostClass: "1", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["1"] = &Host{HostID: "1", HostClass: "2", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
+	hosts["1"] = &Host{HostID: "1", HostClass: "2", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}*/
 }
 
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
-	assignHosts()
+//	assignHosts()
 
 
 	lockClassLEE := make(map[string]*sync.Mutex)
@@ -973,8 +979,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
 //	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
-	router.HandleFunc("/host/createhost/{hostid}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
-	router.HandleFunc("/host/addworker/{hostid}&{workerid}", AddWorker).Methods("POST")
+	router.HandleFunc("/host/createhost/{hostip}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}", UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
 	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
