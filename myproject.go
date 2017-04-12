@@ -57,16 +57,14 @@ type Region struct {
 	classHosts map[string][]*Host
 }
 
-type Lock struct {
-	classHosts map[string]*sync.Mutex //to lock at class level
-	lock	*sync.Mutex //to lock at region level
-}
-
 var regions map[string]Region
 
 var hosts map[string]*Host
 
-var locks map[string]Lock //for locking access to regions/class
+var lockRegionLEE = &sync.Mutex{}
+var lockRegionDEE = &sync.Mutex{}
+var lockRegionEED = &sync.Mutex{}
+var lockHosts = &sync.Mutex{}
 
 //adapted binary search algorithm for inserting orderly based on total resources of a host
 //this is ascending order (for EED region)
@@ -163,7 +161,6 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	newCPU := params["newcpu"]
 	newMemory := params["newmemory"]
 
-	//TODO ver se este sleep é realmente preciso
 	time.Sleep(time.Second * 2)
 
 	//update the task with cut resources
@@ -189,14 +186,18 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64)	
 	
-	locks["LEE"].classHosts["4"].Lock()
+	fmt.Println("Creating host")
+
 	hosts[hostID] = &Host{HostID: hostID, HostIP: "192.168.1.170", HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs}
+
+
+	fmt.Println(hosts[hostID])
 	
 	newHost := make([]*Host, 0)
 	newHost = append(newHost, hosts[hostID])
-	
+
 	regions["LEE"].classHosts["4"] = append(regions["LEE"].classHosts["4"], newHost...)
-	locks["LEE"].classHosts["4"].Unlock()
+	fmt.Println(regions["LEE"].classHosts["4"])
 
 }
 
@@ -240,17 +241,13 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	newHostClass := params["requestclass"]
 	hostID := params["hostid"]
 
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()
 	host := hosts[hostID]
 	if host.HostClass > newHostClass { //we only update the host class if the current class is higher
 		hosts[hostID].HostClass = newHostClass
 		//we need to update the list where this host is at
-		locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
 		UpdateHostList(host.HostClass, newHostClass, hosts[host.HostID])
 		return
 	}
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
-
 }
 
 func InsertHost(classHosts []*Host, index int, host *Host) []*Host {
@@ -269,35 +266,24 @@ func InsertHost(classHosts []*Host, index int, host *Host) []*Host {
 //this function needs to remove the host from its previous class and update it to the new
 func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 	//this deletes
-	locks[host.Region].classHosts[hostPreviousClass].Lock()
 	for i := 0; i < len(regions[host.Region].classHosts[hostPreviousClass]); i++ {
 		if regions[host.Region].classHosts[hostPreviousClass][i].HostID == host.HostID {
 			regions[host.Region].classHosts[hostPreviousClass] = append(regions[host.Region].classHosts[hostPreviousClass][:i], regions[host.Region].classHosts[hostPreviousClass][i+1:]...)
-			break
 		}
 	}
-	locks[host.Region].classHosts[hostPreviousClass].Unlock()
-
 	//this inserts in new list
 	if host.Region == "LEE" || host.Region == "DEE" {
-		locks[host.Region].classHosts[hostNewClass].Lock()
 		index := ReverseSort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
 		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
-		locks[host.Region].classHosts[hostNewClass].Unlock()
 	} else {
-		locks[host.Region].classHosts[hostNewClass].Lock()
 		index := Sort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
 		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
-		locks[host.Region].classHosts[hostNewClass].Unlock()
 	}
 }
 
 //implies list change
 func UpdateHostRegion(hostID string, newRegion string) {
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()
 	hosts[hostID].Region = newRegion
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
-
 	UpdateHostRegionList(hosts[hostID].Region, newRegion, hosts[hostID])
 	return
 }
@@ -305,26 +291,18 @@ func UpdateHostRegion(hostID string, newRegion string) {
 //first we must remove the host from the previous region then insert it in the new onw
 func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	//this deletes
-	locks[oldRegion].classHosts[host.HostClass].Lock()
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
 		if regions[oldRegion].classHosts[host.HostClass][i].HostID == host.HostID {
 			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
-			break
 		}
 	}
-	locks[oldRegion].classHosts[host.HostClass].Unlock()
-
 	//this inserts in new list
 	if newRegion == "LEE" || newRegion == "DEE" {
-		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)		
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
-		locks[newRegion].classHosts[host.HostClass].Unlock()
 	} else {
-		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := Sort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
-		locks[newRegion].classHosts[host.HostClass].Unlock()
 	}
 }
 
@@ -375,48 +353,19 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 	listHosts := make([]*Host, 0)
 
 	if requestClass == "1" {
-		locks["LEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
 	} else if requestClass == "2" {
-		locks["LEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
-
-		locks["LEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-
 	} else if requestClass == "3" {
-		locks["LEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
-
-		locks["LEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-
-		locks["LEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
 	} else if requestClass == "4" {
-		locks["LEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
-
-		locks["LEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-
-		locks["LEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
-		locks["LEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-
 	}
 	return listHosts
 }
@@ -429,48 +378,20 @@ func GetHostsLEE_cut(requestClass string) []*Host {
 	listHosts := make([]*Host, 0)
 
 	if requestClass == "1" {
-		locks["LEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
-
-		locks["LEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-		
-		locks["LEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-		
-		locks["LEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-
 	} else if requestClass == "2" {
-		locks["LEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-
-		locks["LEE"].classHosts["3"].Lock()	
 		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
-		locks["LEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
+
 	} else if requestClass == "3" {
-		locks["LEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
-
-		locks["LEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-
 	} else if requestClass == "4" {
-		locks["LEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
 	}
 
 	return listHosts
@@ -483,48 +404,21 @@ func GetHostsDEE_normal(requestClass string) []*Host {
 	listHosts := make([]*Host, 0)
 
 	if requestClass == "1" {
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
 	} else if requestClass == "2" {
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-		
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
 	} else if requestClass == "3" {
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
 	} else if requestClass == "4" {
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
 	}
+
 	return listHosts
 }
 
@@ -534,49 +428,24 @@ func GetHostsDEE_cut(requestClass string) []*Host {
 	//class 1 hosts are always selected
 	listHosts := make([]*Host, 0)
 	if requestClass == "1" {
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-
 	} else if requestClass == "2" {
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
 
 	} else if requestClass == "3" {
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
 	} else if requestClass == "4" {
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
 	}
+
 	return listHosts
+
 }
 
 //for KILL algorithm
@@ -585,75 +454,28 @@ func GetHostsDEE_kill(requestClass string) []*Host {
 
 	switch requestClass {
 	case "1":
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
 		break
 	case "2":
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
 		break
 	case "3":
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-	
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
 		break
 	case "4":
-		locks["DEE"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
-
 		break
 	}
 	return listHosts
@@ -664,75 +486,28 @@ func GetHostsEED(requestClass string) []*Host {
 
 	switch requestClass {
 	case "1":
-		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
-		locks["EED"].classHosts["1"].Unlock()
-
-		locks["EED"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
-		locks["EED"].classHosts["2"].Unlock()
-
-		locks["EED"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
-		locks["EED"].classHosts["3"].Unlock()
-
-		locks["EED"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
-		locks["EED"].classHosts["4"].Unlock()
-
 		break
 	case "2":
-		locks["EED"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
-		locks["EED"].classHosts["2"].Unlock()
-
-		locks["EED"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
-		locks["EED"].classHosts["3"].Unlock()
-	
-		locks["EED"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
-		locks["EED"].classHosts["4"].Unlock()
-		
-		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
-		locks["EED"].classHosts["1"].Unlock()
 		break
 	case "3":
-		locks["EED"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
-		locks["EED"].classHosts["3"].Unlock()
-
-		locks["EED"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
-		locks["EED"].classHosts["4"].Unlock()
-
-		locks["EED"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
-		locks["EED"].classHosts["2"].Unlock()
-
-		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
-		locks["EED"].classHosts["1"].Unlock()
-
 		break
 	case "4":
-		locks["EED"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
-		locks["EED"].classHosts["4"].Unlock()
-
-		locks["EED"].classHosts["3"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["3"]...)
-		locks["EED"].classHosts["3"].Unlock()
-
-		locks["EED"].classHosts["2"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["2"]...)
-		locks["EED"].classHosts["2"].Unlock()
-
-		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
-		locks["EED"].classHosts["1"].Unlock()
-
 		break
 	}
 	return listHosts
@@ -750,12 +525,9 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 
 	for hostID, host := range hosts {
 		if hostIP == host.HostIP {
-			locks[host.Region].classHosts[host.HostClass].Lock()			
 			hosts[hostID].CPU_Utilization = cpuUpdate
 			hosts[hostID].MemoryUtilization = memoryUpdate
-			locks[host.Region].classHosts[host.HostClass].Unlock()			
-			go UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostID)
-			return
+			UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostID)
 		}
 	}
 }
@@ -770,60 +542,46 @@ func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, 
 		case 1:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
 			newMemory, _ := strconv.ParseFloat(memory, 64)
-			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)
-
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)		
 			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			break
 		case 2:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
 			memory,_ := strconv.ParseFloat(hosts[hostID].MemoryUtilization, 64)
-			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1, 64)
-
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()							
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1, 64)		
 			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			break
 		case 3:
 			newMemory, _ := strconv.ParseFloat(memory, 64)
 			cpu,_ := strconv.ParseFloat(hosts[hostID].CPU_Utilization, 64)
-			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1, 64)
-
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()							
+			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1, 64)		
 			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			break
 	}
 	//now we must check if the host region should be updated or not
 	if !CheckIfRegionUpdate(hostID) && afterTotalResourceUtilization != previousTotalResourceUtilization { //if an update to the host region is not required then we update this host position inside its region list
 		hostRegion := hosts[hostID].Region
-		go UpdateHostRegionList(hostRegion, hostRegion, hosts[hostID])		
+		UpdateHostRegionList(hostRegion, hostRegion, hosts[hostID])		
 	}
 }
 
 func CheckIfRegionUpdate(hostID string) bool {
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
 	if hosts[hostID].TotalResourcesUtilization < "0.5" { //LEE region
 		if hosts[hostID].Region != "LEE" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			UpdateHostRegion(hostID, "LEE")
 			return true
 		}
 	} else if hosts[hostID].TotalResourcesUtilization < "0.85" { //DEE region
 		if hosts[hostID].Region != "DEE" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			UpdateHostRegion(hostID, "DEE")
 			return true
 		}
 	} else { //EED region
 		if hosts[hostID].Region != "EED" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 			UpdateHostRegion(hostID, "EED")
 			return true
 		}
 	}
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 	return false
 }
 
@@ -837,12 +595,8 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 
 	for hostID, host := range hosts {
 		if hostIP == host.HostIP {
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
 			hosts[hostID].CPU_Utilization = cpuUpdate
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
-					
-			go UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostID)
-			return
+			UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostID)
 		}
 	}
 }
@@ -857,12 +611,8 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 
 	for hostID, host := range hosts {
 		if hostIP == host.HostIP {
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
 			hosts[hostID].MemoryUtilization = memoryUpdate
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
-					
-			go UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostID)
-			return
+			UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostID)
 		}
 	}
 }
@@ -882,8 +632,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
-
 	hosts[hostID].AllocatedCPUs += auxCPU
 	hosts[hostID].AllocatedMemory += auxMemory
 
@@ -891,13 +639,11 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	memoryOverbooking := hosts[hostID].AllocatedMemory / hosts[hostID].TotalMemory
 
 	hosts[hostID].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
 }
 
 func main() {
 	regions = make(map[string]Region)
 	hosts = make(map[string]*Host)
-	locks = make(map[string]Lock)	
 
 	ServeSchedulerRequests()
 }
@@ -916,31 +662,6 @@ func assignHosts(){
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
 	assignHosts()
-
-
-	lockClassLEE := make(map[string]*sync.Mutex)
-	lockClassDEE := make(map[string]*sync.Mutex)
-	lockClassEED := make(map[string]*sync.Mutex)
-
-	lockClassLEE["1"] = &sync.Mutex{}
-	lockClassLEE["2"] = &sync.Mutex{}
-	lockClassLEE["3"] = &sync.Mutex{}
-	lockClassLEE["4"] = &sync.Mutex{}
-
-	lockClassDEE["1"] = &sync.Mutex{}
-	lockClassDEE["2"] = &sync.Mutex{}
-	lockClassDEE["3"] = &sync.Mutex{}
-	lockClassDEE["4"] = &sync.Mutex{}
-
-	lockClassEED["1"] = &sync.Mutex{}
-	lockClassEED["2"] = &sync.Mutex{}
-	lockClassEED["3"] = &sync.Mutex{}
-	lockClassEED["4"] = &sync.Mutex{}
-
-	locks["LEE"] = Lock{classHosts: lockClassLEE, lock: &sync.Mutex{}}
-	locks["DEE"] = Lock{lockClassDEE, &sync.Mutex{}}
-	locks["EED"] = Lock{lockClassEED, &sync.Mutex{}}
-
 
 	classLEE := make(map[string][]*Host)
 	classDEE := make(map[string][]*Host)
