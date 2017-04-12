@@ -181,7 +181,6 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	_ = json.NewDecoder(req.Body).Decode(&host)
 
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
-	hosts[host.HostID] = &host
 */
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
@@ -206,11 +205,9 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 //function used to associate a worker to a host when the worker is created
 func AddWorker(w http.ResponseWriter, req *http.Request) {
 	/*	params := mux.Vars(req)
-	//	hostID := params["hostid"]
 		workerID := params["workerid"]
 	/*
 		for index, host := range hosts {
-			if host.HostID == hostID {
 				lockHosts.Lock()
 				hosts[index].WorkerNodesID = append(hosts[index].WorkerNodesID, workerID)
 				lockHosts.Unlock()
@@ -743,22 +740,22 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 	cpuUpdate := params["cpu"]
 	memoryUpdate := params["memory"]
 
-	for hostID, host := range hosts {
+	for _, host := range hosts {
 		if hostIP == host.HostIP {
 			locks[host.Region].classHosts[host.HostClass].Lock()			
-			hosts[hostID].CPU_Utilization = cpuUpdate
-			hosts[hostID].MemoryUtilization = memoryUpdate
+			hosts[hostIP].CPU_Utilization = cpuUpdate
+			hosts[hostIP].MemoryUtilization = memoryUpdate
 			locks[host.Region].classHosts[host.HostClass].Unlock()			
-			go UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostID)
+			go UpdateTotalResourcesUtilization(cpuUpdate, memoryUpdate, 1, hostIP)
 			return
 		}
 	}
 }
 
 //function whose job is to check whether the total resources should be updated or not.
-func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, hostID string){
+func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, hostIP string){
 	//this will be used in case there is no region change to avoid updating the host position in its current region if its total has not changed
-	previousTotalResourceUtilization := hosts[hostID].TotalResourcesUtilization
+	previousTotalResourceUtilization := hosts[hostIP].TotalResourcesUtilization
 	afterTotalResourceUtilization := ""
 
 	switch updateType {
@@ -767,58 +764,58 @@ func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, 
 			newMemory, _ := strconv.ParseFloat(memory, 64)
 			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, newMemory), 'f',-1, 64)
 
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
-			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
+			hosts[hostIP].TotalResourcesUtilization = afterTotalResourceUtilization
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			break
 		case 2:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
-			memory,_ := strconv.ParseFloat(hosts[hostID].MemoryUtilization, 64)
+			memory,_ := strconv.ParseFloat(hosts[hostIP].MemoryUtilization, 64)
 			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(newCPU, memory), 'f',-1, 64)
 
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()							
-			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()							
+			hosts[hostIP].TotalResourcesUtilization = afterTotalResourceUtilization
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			break
 		case 3:
 			newMemory, _ := strconv.ParseFloat(memory, 64)
-			cpu,_ := strconv.ParseFloat(hosts[hostID].CPU_Utilization, 64)
+			cpu,_ := strconv.ParseFloat(hosts[hostIP].CPU_Utilization, 64)
 			afterTotalResourceUtilization = strconv.FormatFloat(math.Max(cpu, newMemory), 'f',-1, 64)
 
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()							
-			hosts[hostID].TotalResourcesUtilization = afterTotalResourceUtilization
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()							
+			hosts[hostIP].TotalResourcesUtilization = afterTotalResourceUtilization
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			break
 	}
 	//now we must check if the host region should be updated or not
-	if !CheckIfRegionUpdate(hostID) && afterTotalResourceUtilization != previousTotalResourceUtilization { //if an update to the host region is not required then we update this host position inside its region list
-		hostRegion := hosts[hostID].Region
-		go UpdateHostRegionList(hostRegion, hostRegion, hosts[hostID])		
+	if !CheckIfRegionUpdate(hostIP) && afterTotalResourceUtilization != previousTotalResourceUtilization { //if an update to the host region is not required then we update this host position inside its region list
+		hostRegion := hosts[hostIP].Region
+		go UpdateHostRegionList(hostRegion, hostRegion, hosts[hostIP])		
 	}
 }
 
-func CheckIfRegionUpdate(hostID string) bool {
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
-	if hosts[hostID].TotalResourcesUtilization < "0.5" { //LEE region
-		if hosts[hostID].Region != "LEE" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
-			UpdateHostRegion(hostID, "LEE")
+func CheckIfRegionUpdate(hostIP string) bool {
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
+	if hosts[hostIP].TotalResourcesUtilization < "0.5" { //LEE region
+		if hosts[hostIP].Region != "LEE" { //if this is true then we must update this host region because it changed
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
+			UpdateHostRegion(hostIP, "LEE")
 			return true
 		}
-	} else if hosts[hostID].TotalResourcesUtilization < "0.85" { //DEE region
-		if hosts[hostID].Region != "DEE" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
-			UpdateHostRegion(hostID, "DEE")
+	} else if hosts[hostIP].TotalResourcesUtilization < "0.85" { //DEE region
+		if hosts[hostIP].Region != "DEE" { //if this is true then we must update this host region because it changed
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
+			UpdateHostRegion(hostIP, "DEE")
 			return true
 		}
 	} else { //EED region
-		if hosts[hostID].Region != "EED" { //if this is true then we must update this host region because it changed
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
-			UpdateHostRegion(hostID, "EED")
+		if hosts[hostIP].Region != "EED" { //if this is true then we must update this host region because it changed
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
+			UpdateHostRegion(hostIP, "EED")
 			return true
 		}
 	}
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 	return false
 }
 
@@ -830,13 +827,13 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 
 	fmt.Println("Updating cpu " + cpuUpdate)
 
-	for hostID, host := range hosts {
+	for _, host := range hosts {
 		if hostIP == host.HostIP {
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
-			hosts[hostID].CPU_Utilization = cpuUpdate
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
+			hosts[hostIP].CPU_Utilization = cpuUpdate
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 					
-			go UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostID)
+			go UpdateTotalResourcesUtilization(cpuUpdate, "", 2, hostIP)
 			return
 		}
 	}
@@ -850,13 +847,13 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 
 	fmt.Println("Updating memory")
 
-	for hostID, host := range hosts {
+	for _, host := range hosts {
 		if hostIP == host.HostIP {
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
-			hosts[hostID].MemoryUtilization = memoryUpdate
-			locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
+			hosts[hostIP].MemoryUtilization = memoryUpdate
+			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 					
-			go UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostID)
+			go UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostIP)
 			return
 		}
 	}
@@ -867,7 +864,7 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Request) {
 	//é preciso host id, cpu e memoria do request 
 	params := mux.Vars(req)
-	hostID := params["hostid"]
+	hostIP := params["hostip"]
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
 
@@ -877,16 +874,16 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Lock()					
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
 
-	hosts[hostID].AllocatedCPUs += auxCPU
-	hosts[hostID].AllocatedMemory += auxMemory
+	hosts[hostIP].AllocatedCPUs += auxCPU
+	hosts[hostIP].AllocatedMemory += auxMemory
 
-	cpuOverbooking := hosts[hostID].AllocatedCPUs / hosts[hostID].TotalCPUs
-	memoryOverbooking := hosts[hostID].AllocatedMemory / hosts[hostID].TotalMemory
+	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
+	memoryOverbooking := hosts[hostIP].AllocatedMemory / hosts[hostIP].TotalMemory
 
-	hosts[hostID].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
-	locks[hosts[hostID].Region].classHosts[hosts[hostID].HostClass].Unlock()					
+	hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 }
 
 func main() {
@@ -977,8 +974,9 @@ func ServeSchedulerRequests() {
 	//	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}", GetListHostsLEE_DEE).Methods("GET")
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
-	router.HandleFunc("/host/updateclass/{requestclass}&{hostid}", UpdateHostClass).Methods("GET")
+	router.HandleFunc("/host/updateclass/{requestclass}&{hostip}", UpdateHostClass).Methods("GET")
 //	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
+	router.HandleFunc("/host/addworker/{hostip}&{workerid}", AddWorker).Methods("POST")
 	router.HandleFunc("/host/createhost/{hostip}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}", UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
@@ -986,7 +984,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
-	router.HandleFunc("/host/updateresources/{hostid}&{cpu}&{memory}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
+	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
 
 	//	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 	//	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
