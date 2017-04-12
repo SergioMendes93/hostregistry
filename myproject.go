@@ -213,8 +213,12 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	_ = json.NewDecoder(req.Body).Decode(&newWorker)
 	addWorker := make([]*node.Node, 0)
 	addWorker = append(addWorker, newWorker)
-	
+
+	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Lock()	
 	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
+	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Unlock()	
+
+	fmt.Println(hosts[newWorker.IP].WorkerNodes)
 }
 
 //function used to update host class when a new task arrives
