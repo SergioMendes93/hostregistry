@@ -216,14 +216,11 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 		}*/
 	//PARA UMA FASE DE TESTES
 
-	var newWorker *node.Node
-	_ = json.NewDecoder(req.Body).Decode(&newWorker)
+	var newWorker node.Node
+	_ = json.NewDecoder(req.Body).Decode(newWorker)
 
-	fmt.Println("Worker IP")
-	fmt.Println(newWorker.IP)
-	fmt.Println(newWorker)
 
-	hosts[newWorker.IP].WorkerNode = newWorker	
+	hosts[newWorker.IP].WorkerNode = &newWorker	
 }
 
 //function used to update host class when a new task arrives
