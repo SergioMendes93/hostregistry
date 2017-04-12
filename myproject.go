@@ -387,18 +387,28 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 
 	} else if requestClass == "4" {
 		locks["LEE"].classHosts["1"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		if len(regions["LEE"].classHosts["1"]) > 0 {
+			listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+		}
 		locks["LEE"].classHosts["1"].Unlock()
 
 		locks["LEE"].classHosts["2"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		if len(regions["LEE"].classHosts["2"]) > 0 {
+			listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+		}
 		locks["LEE"].classHosts["2"].Unlock()
 
 		locks["LEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		if len(regions["LEE"].classHosts["3"]) > 0 {
+			listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+		}
 		locks["LEE"].classHosts["3"].Unlock()
 
 		locks["LEE"].classHosts["4"].Lock()
+		if len(regions["LEE"].classHosts["4"]) > 0 {
+			listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
+		}
+
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 		locks["LEE"].classHosts["4"].Unlock()
 
