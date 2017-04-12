@@ -409,11 +409,10 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 
 		locks["LEE"].classHosts["4"].Lock()
 		if len(regions["LEE"].classHosts["4"]) > 0 {
-			fmt.Println("AQUII)"
+			fmt.Println("AQUII")
 			listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 		}
 
-		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 		locks["LEE"].classHosts["4"].Unlock()
 
 	}
