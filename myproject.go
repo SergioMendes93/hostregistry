@@ -388,24 +388,28 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 	} else if requestClass == "4" {
 		locks["LEE"].classHosts["1"].Lock()
 		if len(regions["LEE"].classHosts["1"]) > 0 {
+			fmt.Println("Shoudl not")
 			listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
 		}
 		locks["LEE"].classHosts["1"].Unlock()
 
 		locks["LEE"].classHosts["2"].Lock()
 		if len(regions["LEE"].classHosts["2"]) > 0 {
+			fmt.Println("Shoudl not")
 			listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
 		}
 		locks["LEE"].classHosts["2"].Unlock()
 
 		locks["LEE"].classHosts["3"].Lock()
 		if len(regions["LEE"].classHosts["3"]) > 0 {
+			fmt.Println("Shoudl not")
 			listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
 		}
 		locks["LEE"].classHosts["3"].Unlock()
 
 		locks["LEE"].classHosts["4"].Lock()
 		if len(regions["LEE"].classHosts["4"]) > 0 {
+			fmt.Println("AQUII)"
 			listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 		}
 
