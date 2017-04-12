@@ -38,7 +38,7 @@ type Node struct {
 type Host struct {
 	HostID                    string       `json:"hostid,omitempty"`
 	HostIP                    string       `json:"hostip, omitempty"`
-	WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
+	WorkerNode                *node.Node    `json:"workernode,omitempty"` //contains the reference used by the scheduler to identify the host
 	HostClass                 string       `json:"hostclass,omitempty"`
 	Region                    string       `json:"region,omitempty"`
 	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
@@ -218,19 +218,8 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 
 	var newWorker *node.Node
 	_ = json.NewDecoder(req.Body).Decode(&newWorker)
-	addWorker := make([]*node.Node, 0)
-	addWorker = append(addWorker, newWorker)
-	
-	//TODO this for will no longer be needed, just use hosts[hostID]
-	for hostID, _ := range hosts {
-		//Temporary to avoid several workers from being added
-		for _, existingWorker := range hosts[hostID].WorkerNodes {
-			if existingWorker == newWorker {
-				return
-			}
-		}
-		hosts[hostID].WorkerNodes = append(hosts[hostID].WorkerNodes, addWorker...)
-	}
+
+	hosts[newWorker.ID].WorkerNode = newWorker	
 }
 
 //function used to update host class when a new task arrives
