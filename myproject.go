@@ -223,15 +223,7 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	addWorker = append(addWorker, newWorker)
 	
 	//TODO this for will no longer be needed, just use hosts[hostID]
-	for hostID, _ := range hosts {
-		//Temporary to avoid several workers from being added
-		for _, existingWorker := range hosts[hostID].WorkerNodes {
-			if existingWorker == newWorker {
-				return
-			}
-		}
-		hosts[hostID].WorkerNodes = append(hosts[hostID].WorkerNodes, addWorker...)
-	}
+	hosts["0"].WorkerNodes = append([]*node.Node{newWorker},hosts["0"].WorkerNodes...)
 }
 
 //function used to update host class when a new task arrives
