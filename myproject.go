@@ -188,7 +188,8 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64)	
 	
 	locks["LEE"].classHosts["4"].Lock()
-	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs}
+	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0.0, AllocatedCPUs: 0.0,
+	TotalResourcesUtilization: "0.0", CPU_Utilization: "0.0", MemoryUtilization: "0.0", OverbookingFactor:0.0}
 	
 	newHost := make([]*Host, 0)
 	newHost = append(newHost, hosts[hostIP])
