@@ -214,7 +214,6 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	addWorker = append(addWorker, newWorker)
 	
 	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
-	fmt.Println("AQUI")
 }
 
 //function used to update host class when a new task arrives
