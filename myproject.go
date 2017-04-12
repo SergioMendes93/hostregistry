@@ -221,6 +221,7 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 
 	fmt.Println("Worker IP")
 	fmt.Println(newWorker.IP)
+	fmt.Println(newWorker)
 
 	hosts[newWorker.IP].WorkerNode = newWorker	
 }
