@@ -213,7 +213,7 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	addWorker := make([]*node.Node, 0)
 	addWorker = append(addWorker, newWorker)
 	
-	hosts["0"].WorkerNodes = append(hosts["0"].WorkerNodes, addWorker...)
+	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
 	fmt.Println("AQUI")
 }
 
