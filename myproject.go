@@ -222,7 +222,7 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	fmt.Println("Worker IP")
 	fmt.Println(newWorker.IP)
 
-	hosts[newWorker.ID].WorkerNode = newWorker	
+	hosts[newWorker.IP].WorkerNode = newWorker	
 }
 
 //function used to update host class when a new task arrives
