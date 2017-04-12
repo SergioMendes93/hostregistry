@@ -931,7 +931,7 @@ func ServeSchedulerRequests() {
 	classDEE := make(map[string][]*Host)
 	classEED := make(map[string][]*Host)
 
-	list1LEE := make([]*Host, 0)
+/*	list1LEE := make([]*Host, 0)
 	list1DEE := make([]*Host, 0)
 	list1EED := make([]*Host, 0)
 	list2LEE := make([]*Host, 0)
@@ -959,7 +959,7 @@ func ServeSchedulerRequests() {
 	classDEE["1"] = list1DEE
 	classDEE["2"] = list2DEE
 	classEED["1"] = list1EED
-
+*/
 	regions["LEE"] = Region{classLEE}
 	regions["DEE"] = Region{classDEE}
 	regions["EED"] = Region{classEED}
