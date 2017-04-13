@@ -337,9 +337,8 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 
 	}
 	listHosts = append(listHosts, listHostsDEE...)
-	fmt.Println("here2")
 
-	fmt.Println(listHosts)
+	fmt.Println(listHosts[0])
 
 	json.NewEncoder(w).Encode(listHosts)
 
@@ -406,6 +405,8 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 		locks["LEE"].classHosts["3"].Unlock()
 
 		locks["LEE"].classHosts["4"].Lock()
+	fmt.Println("here2")
+
 			listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 
 		locks["LEE"].classHosts["4"].Unlock()
