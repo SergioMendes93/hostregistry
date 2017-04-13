@@ -132,14 +132,17 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	memory := params["memory"]
 	requestClass := params["requestclass"]
 	image := params["image"]
+	
+	fmt.Println("Rescheduling")	
 
 	cmd := "docker"
-	args := []string{"run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, "--name", "lala1", image}
+	args := []string{"-H", "tcp://0.0.0.0:3375","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, "--name", "lala1", image}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker run")
 		fmt.Println(err)
 	}
+	fmt.Println("Done")
 }
 
 func KillTasks(w http.ResponseWriter, req *http.Request) {
@@ -218,8 +221,6 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
 	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Unlock()	
 
-	fmt.Println("here")
-	fmt.Println(hosts[newWorker.IP].WorkerNodes[0])
 }
 
 //function used to update host class when a new task arrives
@@ -338,8 +339,6 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 	}
 	listHosts = append(listHosts, listHostsDEE...)
 
-	fmt.Println(listHosts[0])
-
 	json.NewEncoder(w).Encode(listHosts)
 
 }
@@ -405,7 +404,6 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 		locks["LEE"].classHosts["3"].Unlock()
 
 		locks["LEE"].classHosts["4"].Lock()
-	fmt.Println("here2")
 
 			listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 
@@ -856,9 +854,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	hostIP := params["hostip"]
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
-
-	fmt.Println("received")
-	fmt.Println(newMemory)
 
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
