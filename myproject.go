@@ -218,7 +218,8 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
 	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Unlock()	
 
-	fmt.Println(hosts[newWorker.IP].WorkerNodes)
+	fmt.Println("here")
+	fmt.Println(hosts[newWorker.IP].WorkerNodes[0])
 }
 
 //function used to update host class when a new task arrives
@@ -336,6 +337,8 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 
 	}
 	listHosts = append(listHosts, listHostsDEE...)
+	fmt.Println("here2")
+
 	fmt.Println(listHosts)
 
 	json.NewEncoder(w).Encode(listHosts)
