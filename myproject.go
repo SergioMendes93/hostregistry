@@ -37,7 +37,7 @@ type Node struct {
 
 type Host struct {
 	HostIP                    string       `json:"hostip, omitempty"`
-	WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
+	WorkerNodes               []*node.Node `json:"workernode,omitempty"`
 	HostClass                 string       `json:"hostclass,omitempty"`
 	Region                    string       `json:"region,omitempty"`
 	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
