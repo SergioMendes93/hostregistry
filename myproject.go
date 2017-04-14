@@ -188,7 +188,8 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
 	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
-	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64)	
+	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64) 
+	totalCPUs *= 1024 //*1024 because 1024 shares equals using 1 cpu by 100%	
 	
 	locks["LEE"].classHosts["4"].Lock()
 	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0.0, AllocatedCPUs: 0.0,
@@ -854,6 +855,9 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	hostIP := params["hostip"]
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
+
+	fmt.Println("CPU")
+	fmt.Println(newCPU)
 
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
