@@ -133,8 +133,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	requestClass := params["requestclass"]
 	image := params["image"]
 	
-	fmt.Println("Rescheduling")	
-
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:3375","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, "--name", "lala1", image}
 
@@ -142,7 +140,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("Error using docker run")
 		fmt.Println(err)
 	}
-	fmt.Println("Done")
 }
 
 func KillTasks(w http.ResponseWriter, req *http.Request) {
@@ -189,7 +186,7 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	hostIP := params["hostip"]
 	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64) 
-	totalCPUs *= 1024 //*1024 because 1024 shares equals using 1 cpu by 100%	
+	totalCPUs *= 1024 // *1024 because 1024 shares equals using 1 cpu by 100%	
 	
 	locks["LEE"].classHosts["4"].Lock()
 	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0.0, AllocatedCPUs: 0.0,
@@ -855,12 +852,19 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	hostIP := params["hostip"]
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
-
-	fmt.Println("CPU")
-	fmt.Println(newCPU)
+	taskID := params["taskid"]
 
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
+
+	//we must update it because of docker swarm bug
+	cmd := "docker"
+    args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
+
+    if err := exec.Command(cmd, args...).Run(); err != nil {
+        fmt.Println("Error using docker run")
+        fmt.Println(err)
+    }
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
 
@@ -972,7 +976,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
-	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
+	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}&{taskid}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
 
 	//	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 	//	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
