@@ -147,7 +147,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	taskID := params["taskid"]
 
 	cmd := "docker"
-	args := []string{"kill", taskID}
+	args := []string{"-H", "tcp://0.0.0.0:3375","kill", taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker update")
@@ -167,7 +167,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 
 	//update the task with cut resources
 	cmd := "docker"
-	args := []string{"update", "-m", newMemory, "-c", newCPU, taskID}
+	args := []string{"-H", "tcp://0.0.0.0:3375","update", "-m", newMemory, "-c", newCPU, taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker update")
