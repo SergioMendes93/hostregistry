@@ -340,6 +340,8 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 
 	}
 	listHosts = append(listHosts, listHostsDEE...)
+	fmt.Println("Got hosts")
+	fmt.Println(listHosts)
 
 	json.NewEncoder(w).Encode(listHosts)
 
