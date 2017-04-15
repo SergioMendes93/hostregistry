@@ -166,6 +166,10 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	time.Sleep(time.Second * 2)
 
 	//update the task with cut resources
+	fmt.Println("Updating due to cut")
+	fmt.Println(newCPU)
+	fmt.Println(newMemory)
+ 	fmt.Println(taskID)
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:3375","update", "-m", newMemory, "-c", newCPU, taskID}
 
