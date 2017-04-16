@@ -403,6 +403,7 @@ func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
 
 	listHosts = append(listHosts, listHostsDEE...)
 
+	fmt.Println("Got kill zone hosts")
 	json.NewEncoder(w).Encode(listHosts)
 
 }
