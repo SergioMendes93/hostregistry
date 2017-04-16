@@ -325,8 +325,14 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 
 //implies list change
 func UpdateHostRegion(hostIP string, newRegion string) {
+	fmt.Println("Updating region")
+
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	oldRegion := hosts[hostIP].Region
+	
+	fmt.Println(oldRegion)
+	fmt.Println(newRegion)
+
 	hosts[hostIP].Region = newRegion
 	locks[oldRegion].classHosts[hosts[hostIP].HostClass].Unlock()
 
