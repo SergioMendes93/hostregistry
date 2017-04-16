@@ -145,6 +145,9 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 func KillTasks(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	taskID := params["taskid"]
+	taskCPU := params["taskcpu"]
+	taskMemory := params["taskmemory"]
+	hostIP := params["hostip"] //ip of the host that contained this task
 
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:3375","kill", taskID}
@@ -153,23 +156,35 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("Error using docker update")
 		fmt.Println(err)
 	}
+
+	cpu,_ := strconv.ParseFloat(taskCPU,64)
+	memory,_ := strconv.ParseFloat(taskMemory,64)	
+
+	auxHost := hosts[hostIP]
+
+	locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
+	
+	hosts[hostIP].AllocatedMemory -= memory
+	hosts[hostIP].AllocatedCPUs -= cpu
+
+	locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
+	
 }
 
-//function responsible to update task resources when there's a cut
+//function responsible to update task resources when there's a cut. It will also update the allocated cpu/memory of the host
 func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	newCPU := params["newcpu"]
 	newMemory := params["newmemory"]
+	hostIP := params["hostip"]
+	cpuCut := params["cpucut"]
+	memoryCut := params["memorycut"]
 
 	//TODO ver se este sleep é realmente preciso
 	time.Sleep(time.Second * 2)
 
 	//update the task with cut resources
-	fmt.Println("Updating due to cut")
-	fmt.Println(newCPU)
-	fmt.Println(newMemory)
- 	fmt.Println(taskID)
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:3375","update", "-m", newMemory, "-c", newCPU, taskID}
 
@@ -177,6 +192,19 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("Error using docker update")
 		fmt.Println(err)
 	}
+
+	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host
+		
+	memoryReduction, _ := strconv.ParseFloat(memoryCut,64)
+	cpuReduction, _ := strconv.ParseFloat(cpuCut,64)
+	auxHost := hosts[hostIP]
+
+    locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
+    
+    hosts[hostIP].AllocatedMemory -= memoryReduction
+    hosts[hostIP].AllocatedCPUs -= cpuReduction
+
+    locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
 }
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
@@ -980,8 +1008,8 @@ func ServeSchedulerRequests() {
 //	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
 	router.HandleFunc("/host/createhost/{hostip}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
 	router.HandleFunc("/host/addworker/{hostip}&{workerid}", AddWorker).Methods("POST")
-	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}", UpdateTaskResources).Methods("GET")
-	router.HandleFunc("/host/killtask/{taskid}", KillTasks).Methods("GET")
+	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}&{hostip}&{cpucut}&{memorycut}", UpdateTaskResources).Methods("GET")
+	router.HandleFunc("/host/killtask/{taskid}&{taskcpu}&{taskmemory}&{hostip}", KillTasks).Methods("GET")
 	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
