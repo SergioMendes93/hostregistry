@@ -163,9 +163,17 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	auxHost := hosts[hostIP]
 
 	locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
+	fmt.Println("KILLING")
+	fmt.Println("Resources before")
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
 	
 	hosts[hostIP].AllocatedMemory -= memory
 	hosts[hostIP].AllocatedCPUs -= cpu
+
+	fmt.Println("AFTER")
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
 	locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
 	
