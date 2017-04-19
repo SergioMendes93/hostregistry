@@ -50,6 +50,11 @@ type Host struct {
 	TotalCPUs				  float64	   `json:"totalcpus, omitempty"`
 }
 
+type TaskResources struct {
+	CPU		float64		`json:"cpu, omitempty"`
+	Memory 	float64		`json:"memory,omitempty"`
+}
+
 //Each region will have 4 lists, one for each overbooking class
 //LEE=Lowest Energy Efficiency, DEE =Desired Energy Efficiency EED=Energy Efficiency Degradation
 type Region struct {
@@ -160,23 +165,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	cpu,_ := strconv.ParseFloat(taskCPU,64)
 	memory,_ := strconv.ParseFloat(taskMemory,64)	
 
-	auxHost := hosts[hostIP]
-
-	locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
-	fmt.Println("KILLING")
-	fmt.Println("Resources before")
-	fmt.Println(hosts[hostIP].AllocatedMemory)
-	fmt.Println(hosts[hostIP].AllocatedCPUs)
-	
-	hosts[hostIP].AllocatedMemory -= memory
-	hosts[hostIP].AllocatedCPUs -= cpu
-
-	fmt.Println("AFTER")
-	fmt.Println(hosts[hostIP].AllocatedMemory)
-	fmt.Println(hosts[hostIP].AllocatedCPUs)
-
-	locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
-	
+	go UpdateResources(cpu, memory, hostIP)
 }
 
 //function responsible to update task resources when there's a cut. It will also update the allocated cpu/memory of the host
@@ -903,9 +892,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	
-	fmt.Println("taskID")
-	fmt.Println(taskID)
-
 	 //get IP from the host where the container is running
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:3375", "inspect", "--format", "{{ .Node.IP }}",taskID }
@@ -919,8 +905,47 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
    }
    	hostIP := string(commandOutput)
 	fmt.Println(hostIP[0])
+	
+	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
+	//it can be taken from the allocatedMemory/CPUs
+	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
+  
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err1 := client.Do(req)
+    if err1 != nil {
+    	panic(err1)
+    }
+	defer resp.Body.Close()
+
+	var taskResources *TaskResources
+	_ = json.NewDecoder(resp.Body).Decode(&taskResources)
+	
+	//update the amount of allocated resources of the host this task was running
+	//TODO: os ... sao retornados pelo task registry no get acima
+	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 }
 
+func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
+	auxHost := hosts[hostIP]
+
+    locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
+    
+    hosts[hostIP].AllocatedMemory -= cpuUpdate
+    hosts[hostIP].AllocatedCPUs -= memoryUpdate
+
+	//update overbooking of this host
+	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
+    memoryOverbooking := hosts[hostIP].AllocatedMemory / hosts[hostIP].TotalMemory
+
+    hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
+	//TODO ver se é preciso ver se é preciso fazer update na region ou na posiçao dentro da propria classe
+
+    locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
+
+}
 
 //updates information about allocated resources and recalculates overbooking factor.
 //this is information received from the Scheduler when it makes a scheduling decision
@@ -949,16 +974,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	    	}
 	}
 
-	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
-
-	hosts[hostIP].AllocatedCPUs += auxCPU
-	hosts[hostIP].AllocatedMemory += auxMemory
-
-	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
-	memoryOverbooking := hosts[hostIP].AllocatedMemory / hosts[hostIP].TotalMemory
-
-	hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
-	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
+	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
 
