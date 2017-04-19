@@ -937,16 +937,17 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 
 	//we must update it because of docker swarm bug
 	
-	fmt.Println("AQUI")
+	fmt.Println(newCPU)
 
 	if newCPU != "0" {
+		fmt.Println("AQUI")
 		cmd := "docker"
-    	args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
+	    	args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
 
-    	if err := exec.Command(cmd, args...).Run(); err != nil {
-        	fmt.Println("Error using docker run")
-        	fmt.Println(err)
-	    }
+    		if err := exec.Command(cmd, args...).Run(); err != nil {
+        		fmt.Println("Error using docker run")
+        		fmt.Println(err)
+	    	}
 	}
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
