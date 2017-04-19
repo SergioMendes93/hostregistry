@@ -897,6 +897,27 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	go UpdateTotalResourcesUtilization("", memoryUpdate, 3, hostIP)
 }
 
+//this function is responsible for receiving by the Scheduler the task that has ended and warn the task registry it no longer exists
+func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
+	params := mux.Vars(req)
+	taskID := params["taskid"]
+
+	 //get IP from the host where the container is running
+    cmd := "docker"
+    args := []string{"-H", "tcp://0.0.0.0:3375", "inspect", "--format", "{{ .Node.IP }}",taskID }
+
+    var  hostIP []byte 
+    var err error 
+
+    if hostIP,err = exec.Command(cmd, args...).Output(); err != nil {
+    	fmt.Println("Error using docker run")
+        fmt.Println(err)
+   	}
+   
+	fmt.Println(hostIP)
+}
+
+
 //updates information about allocated resources and recalculates overbooking factor.
 //this is information received from the Scheduler when it makes a scheduling decision
 func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Request) {
@@ -930,6 +951,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 }
+
 
 func main() {
 	regions = make(map[string]Region)
@@ -1030,6 +1052,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
 	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}&{taskid}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
+	router.HandleFunc("/host/deletetask/{taskid}", WarnTaskRegistry).Methods("GET")
 
 	//	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
 	//	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
@@ -1052,3 +1075,4 @@ func getIPAddress() string {
 	}
 	return ""
 }
+
