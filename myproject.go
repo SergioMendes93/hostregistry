@@ -918,7 +918,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    	}
    
-	fmt.Println(hostIP)
+	fmt.Println(string(hostIP))
 }
 
 
@@ -940,7 +940,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	fmt.Println(newCPU)
 
 	if newCPU != "0" {
-		fmt.Println("AQUI")
 		cmd := "docker"
 	    	args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
 
