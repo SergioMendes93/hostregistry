@@ -898,6 +898,7 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 }
 
 //this function is responsible for receiving by the Scheduler the task that has ended and warn the task registry it no longer exists
+//it will also reduce the amount of allocated resources on the host it used to run
 func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	params := mux.Vars(req)
 	taskID := params["taskid"]
@@ -935,13 +936,16 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
 	//we must update it because of docker swarm bug
-	cmd := "docker"
-    args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
+	
+	if newCPU != "0" {
+		cmd := "docker"
+    	args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
 
-    if err := exec.Command(cmd, args...).Run(); err != nil {
-        fmt.Println("Error using docker run")
-        fmt.Println(err)
-    }
+    	if err := exec.Command(cmd, args...).Run(); err != nil {
+        	fmt.Println("Error using docker run")
+        	fmt.Println(err)
+	    }
+	}
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
 
