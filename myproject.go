@@ -901,6 +901,9 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	params := mux.Vars(req)
 	taskID := params["taskid"]
+	
+	fmt.Println("taskID")
+	fmt.Println(taskID)
 
 	 //get IP from the host where the container is running
     cmd := "docker"
