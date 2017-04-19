@@ -910,15 +910,15 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:3375", "inspect", "--format", "{{ .Node.IP }}",taskID }
 
-    var  hostIP []byte 
+    var commandOutput []byte 
     var err error 
 
-    if hostIP,err = exec.Command(cmd, args...).Output(); err != nil {
+    if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
     	fmt.Println("Error using docker run")
         fmt.Println(err)
-   	}
-   
-	fmt.Println(string(hostIP))
+   }
+   	hostIP := string(commandOutput)
+	fmt.Println(hostIP)
 }
 
 
