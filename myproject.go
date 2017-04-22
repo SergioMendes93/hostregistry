@@ -938,9 +938,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
 	fmt.Println("buga")
-	fmt.Println(auxHost)
-	fmt.Println(auxHost.Region)
-	fmt.Println(auxHost.HostClass)
+	fmt.Println(hostIP)
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
     hosts[hostIP].AllocatedMemory -= cpuUpdate
