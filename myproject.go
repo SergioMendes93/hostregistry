@@ -910,7 +910,8 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	
 	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
 	//it can be taken from the allocatedMemory/CPUs
-	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
+//	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
+	req, err1 := http.NewRequest("GET", "http://146.193.41.143:1234/task/remove/"+taskID, nil)
   
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
