@@ -139,7 +139,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	image := params["image"]
 	
 	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:3375","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, image}
+	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, image}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker run")
@@ -155,7 +155,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	hostIP := params["hostip"] //ip of the host that contained this task
 
 	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:3375","kill", taskID}
+	args := []string{"-H", "tcp://0.0.0.0:2376","kill", taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker update")
@@ -183,7 +183,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 
 	//update the task with cut resources
 	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:3375","update", "-m", newMemory, "-c", newCPU, taskID}
+	args := []string{"-H", "tcp://0.0.0.0:2376","update", "-m", newMemory, "-c", newCPU, taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker update")
@@ -894,7 +894,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	
 	 //get IP from the host where the container is running
     cmd := "docker"
-    args := []string{"-H", "tcp://0.0.0.0:3375", "inspect", "--format", "{{ .Node.IP }}",taskID }
+    args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
 
     var commandOutput []byte 
     var err error 
@@ -966,7 +966,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 
 	if newCPU != "0" {
 		cmd := "docker"
-	    	args := []string{"-H", "tcp://0.0.0.0:3375", "update", "-c", newCPU, taskID}
+	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
 
     		if err := exec.Command(cmd, args...).Run(); err != nil {
         		fmt.Println("Error using docker run")
