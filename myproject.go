@@ -355,7 +355,7 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
 		fmt.Println(regions[oldRegion].classHosts[host.HostClass][i])
 		if regions[oldRegion].classHosts[host.HostClass][i].HostIP == host.HostIP {
-			fmt.Println("updating region + " + regions[oldRegion].classHosts[host.HostClass][i].HostIP + " old region " + oldRegion)
+			fmt.Println("updating region + " + regions[oldRegion].classHosts[host.HostClass][i].HostIP + " old region " + oldRegion + " new region " + newRegion)
 			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
 			break
 		}
