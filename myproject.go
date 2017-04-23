@@ -964,6 +964,8 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	if newCPU != "0" {
 		cmd := "docker"
 		fmt.Println("AQUI2")
+		fmt.Println(newCPU)
+		fmt.Println(taskID)
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
 
     		if err := exec.Command(cmd, args...).Run(); err != nil {
