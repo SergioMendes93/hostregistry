@@ -913,13 +913,10 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	aux := strings.Split(output,"\n")
 	hostIP := aux[0]
 
-	fmt.Println("IP")
-	fmt.Println(hostIP)
 	
 	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
 	//it can be taken from the allocatedMemory/CPUs
-//	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
-	req, err1 := http.NewRequest("GET", "http://146.193.41.143:1234/task/remove/"+taskID, nil)
+	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
   
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
@@ -943,8 +940,16 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
-    hosts[hostIP].AllocatedMemory -= cpuUpdate
-    hosts[hostIP].AllocatedCPUs -= memoryUpdate
+	fmt.Println("Resources before")
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
+
+    hosts[hostIP].AllocatedMemory -= memoryUpdate
+    hosts[hostIP].AllocatedCPUs -= cpuUpdate
+
+	fmt.Println("Resources after")
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
 	//update overbooking of this host
 	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
