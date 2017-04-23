@@ -11,6 +11,7 @@ import (
 	"time"
 	"math"
 	"strconv"	
+	"strings"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -910,7 +911,11 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    }
 
-	hostIP := fmt.Sprintf("%s", commandOutput)
+	host := string(commandOutput)
+	
+	aux := strings.Split(host,"\n")
+	hostIP := aux[0]
+
 	fmt.Println("IP")
 	fmt.Println(hostIP)
 	
