@@ -963,7 +963,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	//we must update it because of docker swarm bug	
 	if newCPU != "0" {
 		cmd := "docker"
-		fmt.Println("AQUI2")
 		fmt.Println(newCPU)
 		fmt.Println(taskID)
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
@@ -973,6 +972,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
         		fmt.Println(err)
 	    	}
 	}
+	fmt.Println("Updating")
 	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
