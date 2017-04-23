@@ -910,6 +910,10 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    }
    	hostIP := string(commandOutput)
+	for _, ip := range hostIP {
+		fmt.Println(ip)
+		fmt.Println("interval")
+	}
 	
 	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
 	//it can be taken from the allocatedMemory/CPUs
@@ -937,8 +941,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
 func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
-	fmt.Println("buga")
-	fmt.Println(hostIP)
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
     hosts[hostIP].AllocatedMemory -= cpuUpdate
