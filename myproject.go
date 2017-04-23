@@ -910,8 +910,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    }
 
-
-	hostIP := string(commandOutput[:])
+	hostIP := fmt.Sprintf("%s", commandOutput)
 	fmt.Println("IP")
 	fmt.Println(hostIP)
 	
