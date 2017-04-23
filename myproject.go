@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 	"sync"
-	"time"
+//	"time"
 	"math"
 	"strconv"	
 	"strings"
@@ -138,6 +138,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	memory := params["memory"]
 	requestClass := params["requestclass"]
 	image := params["image"]
+
+	fmt.Println("Rescheduling task")
 	
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, image}
@@ -154,6 +156,8 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	taskCPU := params["taskcpu"]
 	taskMemory := params["taskmemory"]
 	hostIP := params["hostip"] //ip of the host that contained this task
+
+	fmt.Println("killing task " + hostIP)
 
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:2376","kill", taskID}
@@ -180,7 +184,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	memoryCut := params["memorycut"]
 
 	//TODO ver se este sleep é realmente preciso
-	time.Sleep(time.Second * 2)
+//	time.Sleep(time.Second * 2)
 
 	//update the task with cut resources
 	cmd := "docker"
@@ -198,9 +202,18 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	auxHost := hosts[hostIP]
 
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
-    
+  
+	fmt.Println("cut task, resources before " + hostIP)
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
+  
     hosts[hostIP].AllocatedMemory -= memoryReduction
     hosts[hostIP].AllocatedCPUs -= cpuReduction
+
+	fmt.Println("cut task, resources after " + hostIP)
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
+
 
     locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
 }
@@ -262,6 +275,7 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	currentClass := hosts[hostIP].HostClass
 
+
 	host := hosts[hostIP]
 	if host.HostClass > newHostClass { //we only update the host class if the current class is higher
 		hosts[hostIP].HostClass = newHostClass
@@ -289,6 +303,11 @@ func InsertHost(classHosts []*Host, index int, host *Host) []*Host {
 
 //this function needs to remove the host from its previous class and update it to the new
 func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
+
+	fmt.Println("Updating host class  previous class: " + hostPreviousClass)
+	fmt.Println("before new class deletion")
+	fmt.Println(regions[host.Region].classHosts[hostPreviousClass])
+
 	//this deletes
 	locks[host.Region].classHosts[hostPreviousClass].Lock()
 	for i := 0; i < len(regions[host.Region].classHosts[hostPreviousClass]); i++ {
@@ -297,6 +316,9 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 			break
 		}
 	}
+	fmt.Println("after new class deletion")
+	fmt.Println(regions[host.Region].classHosts[hostPreviousClass])
+	
 	locks[host.Region].classHosts[hostPreviousClass].Unlock()
 
 	//this inserts in new list
@@ -330,11 +352,12 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	//this deletes
 	locks[oldRegion].classHosts[host.HostClass].Lock()
-	fmt.Println("old position")
+	fmt.Println("new position")
 
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
 		fmt.Println(regions[oldRegion].classHosts[host.HostClass][i])
 		if regions[oldRegion].classHosts[host.HostClass][i].HostIP == host.HostIP {
+			fmt.Println("updating region + " + regions[oldRegion].classHosts[host.HostClass][i].HostIP + " old region " + oldRegion)
 			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
 			break
 		}
@@ -408,6 +431,7 @@ func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
 	listHosts = append(listHosts, listHostsDEE...)
 
 	fmt.Println("Got kill zone hosts")
+	fmt.Println(listHosts)
 	json.NewEncoder(w).Encode(listHosts)
 
 }
@@ -923,6 +947,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	
 	 //get IP from the host where the container is running
 
+	fmt.Println("Warn task registry")
 
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
