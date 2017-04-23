@@ -899,7 +899,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
     var commandOutput []byte 
     var err error 
-
+	fmt.Println("AQUI")
    if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
     	fmt.Println("Error using docker run")
         fmt.Println(err)
@@ -963,6 +963,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	//we must update it because of docker swarm bug	
 	if newCPU != "0" {
 		cmd := "docker"
+		fmt.Println("AQUI2")
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
 
     		if err := exec.Command(cmd, args...).Run(); err != nil {
