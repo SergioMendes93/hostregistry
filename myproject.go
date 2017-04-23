@@ -271,20 +271,18 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	newHostClass := params["requestclass"]
 	hostIP := params["hostip"]
 
-
-	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	currentClass := hosts[hostIP].HostClass
 
+	locks[hosts[hostIP].Region].classHosts[currentClass].Lock()
 
-	host := hosts[hostIP]
-	if host.HostClass > newHostClass { //we only update the host class if the current class is higher
+	if currentClass > newHostClass { //we only update the host class if the current class is higher
 		hosts[hostIP].HostClass = newHostClass
 		locks[hosts[hostIP].Region].classHosts[currentClass].Unlock()
 		//we need to update the list where this host is at
-		UpdateHostList(host.HostClass, newHostClass, hosts[host.HostIP])
+		UpdateHostList(currentClass, newHostClass, hosts[hostIP])
 		return
 	}
-	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
+	locks[hosts[hostIP].Region].classHosts[currentClass].Unlock()
 
 }
 
