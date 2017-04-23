@@ -11,6 +11,7 @@ import (
 	"time"
 	"math"
 	"strconv"	
+	"bytes"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -902,17 +903,17 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
 
-//    var commandOutput []byte 
-  //  var err error 
+    var commandOutput []byte 
+    var err error 
 
-   /* if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
+   if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
     	fmt.Println("Error using docker run")
         fmt.Println(err)
-   }*/
-    cmdo := exec.Command(cmd, args...)
+   }
 
-   	host,_ := cmdo.CombinedOutput()
-	hostIP := string(host)
+	n := bytes.IndexByte(commandOutput,0)	
+
+	hostIP := string(commandOutput[:n])
 	fmt.Println("IP")
 	fmt.Println(hostIP)
 	
