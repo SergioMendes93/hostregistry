@@ -902,18 +902,19 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
 
-    var commandOutput []byte 
-    var err error 
+//    var commandOutput []byte 
+  //  var err error 
 
-    if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
+   /* if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
     	fmt.Println("Error using docker run")
         fmt.Println(err)
-   }
-   	hostIP := string(commandOutput)
-	for _, ip := range hostIP {
-		fmt.Println(ip)
-		fmt.Println("interval")
-	}
+   }*/
+    cmdo := exec.Command(cmd, args...)
+
+   	host,_ := cmdo.CombinedOutput()
+	hostIP := string(host)
+	fmt.Println("IP")
+	fmt.Println(hostIP)
 	
 	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
 	//it can be taken from the allocatedMemory/CPUs
