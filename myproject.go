@@ -315,14 +315,10 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 
 //implies list change
 func UpdateHostRegion(hostIP string, newRegion string) {
-	fmt.Println("Updating region")
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	oldRegion := hosts[hostIP].Region
 	
-	fmt.Println(oldRegion)
-	fmt.Println(newRegion)
-
 	hosts[hostIP].Region = newRegion
 	locks[oldRegion].classHosts[hosts[hostIP].HostClass].Unlock()
 
@@ -795,6 +791,7 @@ func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, 
 	previousTotalResourceUtilization := hosts[hostIP].TotalResourcesUtilization
 	afterTotalResourceUtilization := ""
 
+	//1-> both resources, 2-> cpu, 3-> memory
 	switch updateType {
 		case 1:
 			newCPU,_ := strconv.ParseFloat(cpu,64)
@@ -932,7 +929,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	_ = json.NewDecoder(resp.Body).Decode(&taskResources)
 	
 	//update the amount of allocated resources of the host this task was running
-	//TODO: os ... sao retornados pelo task registry no get acima
 	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 }
 
@@ -940,26 +936,15 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
-	fmt.Println("Resources before")
-	fmt.Println(hosts[hostIP].AllocatedMemory)
-	fmt.Println(hosts[hostIP].AllocatedCPUs)
-
     hosts[hostIP].AllocatedMemory -= memoryUpdate
     hosts[hostIP].AllocatedCPUs -= cpuUpdate
-
-	fmt.Println("Resources after")
-	fmt.Println(hosts[hostIP].AllocatedMemory)
-	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
 	//update overbooking of this host
 	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
     memoryOverbooking := hosts[hostIP].AllocatedMemory / hosts[hostIP].TotalMemory
 
     hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
-	//TODO ver se é preciso ver se é preciso fazer update na region ou na posiçao dentro da propria classe
-
     locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
-
 }
 
 //updates information about allocated resources and recalculates overbooking factor.
@@ -975,10 +960,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
-	//we must update it because of docker swarm bug
-	
-	fmt.Println(newCPU)
-
+	//we must update it because of docker swarm bug	
 	if newCPU != "0" {
 		cmd := "docker"
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
@@ -988,7 +970,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
         		fmt.Println(err)
 	    	}
 	}
-
 	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
