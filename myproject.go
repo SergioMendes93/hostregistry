@@ -330,24 +330,42 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	//this deletes
 	locks[oldRegion].classHosts[host.HostClass].Lock()
+	fmt.Println("old position")
+
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
+		fmt.Println(regions[oldRegion].classHosts[host.HostClass][i])
 		if regions[oldRegion].classHosts[host.HostClass][i].HostIP == host.HostIP {
 			regions[oldRegion].classHosts[host.HostClass] = append(regions[oldRegion].classHosts[host.HostClass][:i], regions[oldRegion].classHosts[host.HostClass][i+1:]...)
 			break
 		}
 	}
 	locks[oldRegion].classHosts[host.HostClass].Unlock()
+			
+	fmt.Println("new position")
 
 	//this inserts in new list
 	if newRegion == "LEE" || newRegion == "DEE" {
 		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)		
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
+
+		//FOR DEBUG
+		for i := 0 ; i < len(regions[newRegion].classHosts[host.HostClass]); i++ {
+			fmt.Println( regions[newRegion].classHosts[host.HostClass][i])
+		}
+
 		locks[newRegion].classHosts[host.HostClass].Unlock()
 	} else {
 		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := Sort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
+
+		//FOR DEBUG
+		for i := 0 ; i < len(regions[newRegion].classHosts[host.HostClass]); i++ {
+			fmt.Println( regions[newRegion].classHosts[host.HostClass][i])
+		}
+
+
 		locks[newRegion].classHosts[host.HostClass].Unlock()
 	}
 }
@@ -834,18 +852,30 @@ func CheckIfRegionUpdate(hostIP string) bool {
 		if hosts[hostIP].Region != "LEE" { //if this is true then we must update this host region because it changed
 			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			UpdateHostRegion(hostIP, "LEE")
+
+			fmt.Println("Region UPDATE LEE")
+			fmt.Println(hostIP)
+
 			return true
 		}
 	} else if hosts[hostIP].TotalResourcesUtilization < "0.85" { //DEE region
 		if hosts[hostIP].Region != "DEE" { //if this is true then we must update this host region because it changed
 			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			UpdateHostRegion(hostIP, "DEE")
+
+			fmt.Println("Region UPDATE DEE")
+			fmt.Println(hostIP)
+
 			return true
 		}
 	} else { //EED region
 		if hosts[hostIP].Region != "EED" { //if this is true then we must update this host region because it changed
 			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			UpdateHostRegion(hostIP, "EED")
+
+			fmt.Println("Region UPDATE EED")
+			fmt.Println(hostIP)
+
 			return true
 		}
 	}
@@ -899,7 +929,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
     var commandOutput []byte 
     var err error 
-	fmt.Println("AQUI")
    if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
     	fmt.Println("Error using docker run")
         fmt.Println(err)
@@ -936,8 +965,15 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
+	fmt.Println("Before")
+	fmt.Println(hostIP)
+
     hosts[hostIP].AllocatedMemory -= memoryUpdate
     hosts[hostIP].AllocatedCPUs -= cpuUpdate
+
+	fmt.Println("After")
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
 	//update overbooking of this host
 	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
@@ -972,7 +1008,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
         		fmt.Println(err)
 	    	}
 	}
-	fmt.Println("Updating")
 	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
