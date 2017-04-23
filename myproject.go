@@ -911,7 +911,8 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    }
 
-	n := bytes.IndexByte(commandOutput,0)	
+	n := bytes.Index(commandOutput, []byte{0})
+	fmt.Println(n)
 
 	hostIP := string(commandOutput[:n])
 	fmt.Println("IP")
