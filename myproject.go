@@ -889,7 +889,6 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 
 //this function is responsible for receiving by the Scheduler the task that has ended and warn the task registry it no longer exists
 //it will also reduce the amount of allocated resources on the host it used to run
-var counter = 0
 
 func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	params := mux.Vars(req)
@@ -897,8 +896,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	
 	 //get IP from the host where the container is running
 
-	if counter == 0 {
-	counter = 1
 
     cmd := "docker"
     args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
@@ -911,9 +908,9 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
         fmt.Println(err)
    }
 
-	host := string(commandOutput)
+	output := string(commandOutput)
 	
-	aux := strings.Split(host,"\n")
+	aux := strings.Split(output,"\n")
 	hostIP := aux[0]
 
 	fmt.Println("IP")
@@ -940,7 +937,6 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	//update the amount of allocated resources of the host this task was running
 	//TODO: os ... sao retornados pelo task registry no get acima
 	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
-	}
 }
 
 func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
