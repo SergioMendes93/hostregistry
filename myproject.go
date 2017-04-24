@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os/exec"
 	"sync"
-//	"time"
 	"math"
 	"strconv"	
 	"strings"
@@ -157,7 +156,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	taskMemory := params["taskmemory"]
 	hostIP := params["hostip"] //ip of the host that contained this task
 
-	fmt.Println("killing task " + hostIP)
+	fmt.Println("killing task " + taskID + " at " + hostIP)
 
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:2376","kill", taskID}
@@ -183,9 +182,6 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	cpuCut := params["cpucut"]
 	memoryCut := params["memorycut"]
 
-	//TODO ver se este sleep é realmente preciso
-//	time.Sleep(time.Second * 2)
-
 	//update the task with cut resources
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:2376","update", "-m", newMemory, "-c", newCPU, taskID}
@@ -203,33 +199,28 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
   
-	fmt.Println("cut task, resources before " + hostIP)
+	fmt.Println("cutting task, resources before " + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
   
     hosts[hostIP].AllocatedMemory -= memoryReduction
     hosts[hostIP].AllocatedCPUs -= cpuReduction
 
-	fmt.Println("cut task, resources after " + hostIP)
+	fmt.Println("cutting task, resources after " + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
-
 
     locks[auxHost.Region].classHosts[auxHost.HostClass].Unlock()
 }
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
-
-/*	var host Host
-	_ = json.NewDecoder(req.Body).Decode(&host)
-
-	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
-*/
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
 	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64) 
 	totalCPUs *= 1024 // *1024 because 1024 shares equals using 1 cpu by 100%	
+
+	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
 	
 	locks["LEE"].classHosts["4"].Lock()
 	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0.0, AllocatedCPUs: 0.0,
@@ -245,14 +236,6 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 
 //function used to associate a worker to a host when the worker is created
 func AddWorker(w http.ResponseWriter, req *http.Request) {
-	/*	params := mux.Vars(req)
-		workerID := params["workerid"]
-	/*
-				//TODO: por return aqui
-			}
-		}*/
-	//PARA UMA FASE DE TESTES
-
 	var newWorker *node.Node
 	_ = json.NewDecoder(req.Body).Decode(&newWorker)
 	addWorker := make([]*node.Node, 0)
@@ -261,7 +244,6 @@ func AddWorker(w http.ResponseWriter, req *http.Request) {
 	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Lock()	
 	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
 	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Unlock()	
-
 }
 
 //function used to update host class when a new task arrives
@@ -283,7 +265,6 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	locks[hosts[hostIP].Region].classHosts[currentClass].Unlock()
-
 }
 
 func InsertHost(classHosts []*Host, index int, host *Host) []*Host {
@@ -318,19 +299,32 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 	fmt.Println(regions[host.Region].classHosts[hostPreviousClass])
 	
 	locks[host.Region].classHosts[hostPreviousClass].Unlock()
+		
+	locks[host.Region].classHosts[hostNewClass].Lock()
+	fmt.Println("before new class insertion")
+     //FOR DEBUG
+        for i := 0 ; i < len(regions[host.Region].classHosts[hostNewClass]); i++ {
+            fmt.Println( regions[host.Region].classHosts[hostNewClass][i])
+        }
+
 
 	//this inserts in new list
 	if host.Region == "LEE" || host.Region == "DEE" {
-		locks[host.Region].classHosts[hostNewClass].Lock()
 		index := ReverseSort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
 		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
-		locks[host.Region].classHosts[hostNewClass].Unlock()
 	} else {
-		locks[host.Region].classHosts[hostNewClass].Lock()
 		index := Sort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
 		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
-		locks[host.Region].classHosts[hostNewClass].Unlock()
 	}
+	fmt.Println("after new class insertion")
+     //FOR DEBUG
+        for i := 0 ; i < len(regions[host.Region].classHosts[hostNewClass]); i++ {
+            fmt.Println( regions[host.Region].classHosts[hostNewClass][i])
+        }
+
+
+	locks[host.Region].classHosts[hostNewClass].Unlock()
+
 }
 
 //implies list change
@@ -350,8 +344,8 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	//this deletes
 	locks[oldRegion].classHosts[host.HostClass].Lock()
-	fmt.Println("new position")
 
+	fmt.Println("Updating region list, region elements: ")
 	for i := 0; i < len(regions[oldRegion].classHosts[host.HostClass]); i++ {
 		fmt.Println(regions[oldRegion].classHosts[host.HostClass][i])
 		if regions[oldRegion].classHosts[host.HostClass][i].HostIP == host.HostIP {
@@ -361,34 +355,32 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 		}
 	}
 	locks[oldRegion].classHosts[host.HostClass].Unlock()
+
+	locks[newRegion].classHosts[host.HostClass].Lock()
 			
-	fmt.Println("new position")
+	fmt.Println("before new region")
+		//FOR DEBUG
+		for i := 0 ; i < len(regions[newRegion].classHosts[host.HostClass]); i++ {
+			fmt.Println( regions[newRegion].classHosts[host.HostClass][i])
+		}
 
 	//this inserts in new list
 	if newRegion == "LEE" || newRegion == "DEE" {
-		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := ReverseSort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)		
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
-
-		//FOR DEBUG
-		for i := 0 ; i < len(regions[newRegion].classHosts[host.HostClass]); i++ {
-			fmt.Println( regions[newRegion].classHosts[host.HostClass][i])
-		}
-
-		locks[newRegion].classHosts[host.HostClass].Unlock()
 	} else {
-		locks[newRegion].classHosts[host.HostClass].Lock()
 		index := Sort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
+	}
 
+	fmt.Println("after new region")
 		//FOR DEBUG
 		for i := 0 ; i < len(regions[newRegion].classHosts[host.HostClass]); i++ {
 			fmt.Println( regions[newRegion].classHosts[host.HostClass][i])
 		}
 
+	locks[newRegion].classHosts[host.HostClass].Unlock()
 
-		locks[newRegion].classHosts[host.HostClass].Unlock()
-	}
 }
 
 //used by initial scheduling and cut algorithm
@@ -810,12 +802,12 @@ func GetHostsEED(requestClass string) []*Host {
 //updates both memory and cpu. message received from energy monitors. 
 func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 	//the host is going to be identified by the IP
-	fmt.Println("Updating both")
 
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
 	cpuUpdate := params["cpu"]
 	memoryUpdate := params["memory"]
+	fmt.Println("Updating both at " + hostIP)
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()			
 	hosts[hostIP].CPU_Utilization = cpuUpdate
@@ -830,6 +822,8 @@ func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, 
 	//this will be used in case there is no region change to avoid updating the host position in its current region if its total has not changed
 	previousTotalResourceUtilization := hosts[hostIP].TotalResourcesUtilization
 	afterTotalResourceUtilization := ""
+
+	fmt.Println("Updating total resources utilization at " + hostIP + " previous value " + previousTotalResourceUtilization)
 
 	//1-> both resources, 2-> cpu, 3-> memory
 	switch updateType {
@@ -861,6 +855,9 @@ func UpdateTotalResourcesUtilization(cpu string, memory string, updateType int, 
 			locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()					
 			break
 	}
+
+	fmt.Println("Updating total resources utilization at " + hostIP + " new value " + afterTotalResourceUtilization)
+
 	//now we must check if the host region should be updated or not
 	if !CheckIfRegionUpdate(hostIP) && afterTotalResourceUtilization != previousTotalResourceUtilization { //if an update to the host region is not required then we update this host position inside its region list
 		hostRegion := hosts[hostIP].Region
@@ -911,7 +908,7 @@ func UpdateCPU(w http.ResponseWriter, req *http.Request) {
 	hostIP := params["hostip"]
 	cpuUpdate := params["cpu"]
 
-	fmt.Println("Updating cpu " + cpuUpdate)
+	fmt.Println("Updating cpu " + cpuUpdate + " at " + hostIP)
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
 	hosts[hostIP].CPU_Utilization = cpuUpdate
@@ -927,7 +924,7 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	hostIP := params["hostip"]
 	memoryUpdate := params["memory"]
 
-	fmt.Println("Updating memory")
+	fmt.Println("Updating memory " + memoryUpdate + " at " + hostIP)
 
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()					
 	hosts[hostIP].MemoryUtilization = memoryUpdate
@@ -988,13 +985,15 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	auxHost := hosts[hostIP]
     locks[auxHost.Region].classHosts[auxHost.HostClass].Lock()
     
-	fmt.Println("Before")
-	fmt.Println(hostIP)
+	fmt.Println("Before (UpdateResources) " + hostIP)
+	fmt.Println(hosts[hostIP].AllocatedMemory)
+	fmt.Println(hosts[hostIP].AllocatedCPUs)
+
 
     hosts[hostIP].AllocatedMemory -= memoryUpdate
     hosts[hostIP].AllocatedCPUs -= cpuUpdate
 
-	fmt.Println("After")
+	fmt.Println("After (UpdateResources)" + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
@@ -1022,8 +1021,6 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	//we must update it because of docker swarm bug	
 	if newCPU != "0" {
 		cmd := "docker"
-		fmt.Println(newCPU)
-		fmt.Println(taskID)
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
 
     		if err := exec.Command(cmd, args...).Run(); err != nil {
