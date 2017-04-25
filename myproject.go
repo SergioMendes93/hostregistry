@@ -55,6 +55,15 @@ type TaskResources struct {
 	Memory 	float64		`json:"memory,omitempty"`
 }
 
+//this struct is used when a rescheduling is performed
+type Task struct {
+	CPU 		string 	`json:"cpu, omitempty"`
+	Memory 		string 	`json:"memory,omitempty"`
+	TaskClass 	string	`json:"taskclass,omitempty"`
+	Image 		string 	`json:"image,omitempty"`
+}
+
+
 //Each region will have 4 lists, one for each overbooking class
 //LEE=Lowest Energy Efficiency, DEE =Desired Energy Efficiency EED=Energy Efficiency Degradation
 type Region struct {
@@ -133,17 +142,14 @@ func ReverseSort(classList []*Host, searchValue float64) int {
 
 func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 
-	params := mux.Vars(req)
-	cpu := params["cpu"]
-	memory := params["memory"]
-	requestClass := params["requestclass"]
-	image := params["image"]
+	var task Task
+	_ = json.NewDecoder(req.Body).Decode(&task)	
 
-	fmt.Println("Rescheduling task image: " + image)
+	fmt.Println("Rescheduling task")
+	fmt.Println(task)
 
-	
 	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, image}
+	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker run")
@@ -1131,7 +1137,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/addworker/{hostip}&{workerid}", AddWorker).Methods("POST")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}&{hostip}&{cpucut}&{memorycut}", UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}&{taskcpu}&{taskmemory}&{hostip}", KillTasks).Methods("GET")
-	router.HandleFunc("/host/reschedule/{cpu}&{memory}&{requestclass}&{image}", RescheduleTask).Methods("GET")
+	router.HandleFunc("/host/reschedule", RescheduleTask).Methods("POST")
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
