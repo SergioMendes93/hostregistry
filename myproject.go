@@ -994,7 +994,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
 	//update the amount of allocated resources of the host this task was running
 	//we only update if this wasnt performed before.
-	if taskResources.Memory != -1 {
+	if taskResources.Memory != -1.0 {
 		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
 		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 	}
