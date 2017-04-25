@@ -132,13 +132,15 @@ func ReverseSort(classList []*Host, searchValue float64) int {
 }
 
 func RescheduleTask(w http.ResponseWriter, req *http.Request) {
+
 	params := mux.Vars(req)
 	cpu := params["cpu"]
 	memory := params["memory"]
 	requestClass := params["requestclass"]
 	image := params["image"]
 
-	fmt.Println("Rescheduling task")
+	fmt.Println("Rescheduling task image: " + image)
+
 	
 	cmd := "docker"
 	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", cpu, "-m", memory, "-e", "affinity:requestclass==" + requestClass, image}
