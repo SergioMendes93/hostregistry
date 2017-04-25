@@ -162,8 +162,8 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	hostIP := params["hostip"] //ip of the host that contained this task
-	taskCPU := params["cpu"]
-	taskMemory := params["memory"]
+	taskCPU := params["taskcpu"]
+	taskMemory := params["taskmemory"]
 
 	cpu,_ := strconv.ParseFloat(taskCPU,64)
  	memory,_ := strconv.ParseFloat(taskMemory,64)	
@@ -994,9 +994,12 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
 	//update the amount of allocated resources of the host this task was running
 	//we only update if this wasnt performed before.
+
+
 	if taskResources.Memory != -1.0 {
-		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
 		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
+	} else {
+		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
 	}
 }
 
@@ -1047,6 +1050,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
         		fmt.Println(err)
 	    	}
 	}
+	fmt.Println("UPDATING RESOURCES OF: " + taskID)
 	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
