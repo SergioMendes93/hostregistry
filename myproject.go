@@ -152,7 +152,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker run")
+		fmt.Println("Error using docker run at rescheduling")
 		fmt.Println(err)
 	}
 }
@@ -168,7 +168,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	args := []string{"-H", "tcp://0.0.0.0:2376","kill", taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker update")
+		fmt.Println("Error using docker run at kill tasks")
 		fmt.Println(err)
 	}
 
@@ -191,7 +191,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	args := []string{"-H", "tcp://0.0.0.0:2376","update", "-m", newMemory, "-c", newCPU, taskID}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker update")
+		fmt.Println("Error using docker update at update task resources")
 		fmt.Println(err)
 	}
 
@@ -960,7 +960,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
     var commandOutput []byte 
     var err error 
    if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
-    	fmt.Println("Error using docker run")
+    	fmt.Println("Error using docker run at warn task registry")
         fmt.Println(err)
    }
 
@@ -1035,7 +1035,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
 
     		if err := exec.Command(cmd, args...).Run(); err != nil {
-        		fmt.Println("Error using docker run")
+        		fmt.Println("Error using docker run at updating task when its created")
         		fmt.Println(err)
 	    	}
 	}
