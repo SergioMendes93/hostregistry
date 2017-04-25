@@ -336,7 +336,7 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 	hosts[hostIP].Region = newRegion
 	locks[oldRegion].classHosts[hosts[hostIP].HostClass].Unlock()
 
-	UpdateHostRegionList(hosts[hostIP].Region, newRegion, hosts[hostIP])
+	UpdateHostRegionList(oldRegion, newRegion, hosts[hostIP])
 	return
 }
 
