@@ -149,7 +149,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	fmt.Println(task)
 
 	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image}
+//	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image}
+	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==3", task.Image}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker run at rescheduling")
