@@ -152,8 +152,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 func KillTasks(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	taskID := params["taskid"]
-	taskCPU := params["taskcpu"]
-	taskMemory := params["taskmemory"]
 	hostIP := params["hostip"] //ip of the host that contained this task
 
 	fmt.Println("killing task " + taskID + " at " + hostIP)
@@ -165,9 +163,6 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("Error using docker update")
 		fmt.Println(err)
 	}
-
-	cpu,_ := strconv.ParseFloat(taskCPU,64)
-	memory,_ := strconv.ParseFloat(taskMemory,64)	
 
 	//no longer updates resources when killing a task because at the scheduler the container will exit  and that also updates resources so it would be updating it twice
 	//go UpdateResources(cpu, memory, hostIP)
@@ -947,10 +942,8 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	
-	//update the amount of allocated resources of the host this task was running
-	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 
-	fmt.Println("Warn task registry")
+	fmt.Println("Warn task registry task id: " + taskID)
 	
 	//this command gets the IP from where the container was running 
     cmd := "docker"
@@ -985,6 +978,10 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
 	var taskResources *TaskResources
 	_ = json.NewDecoder(resp.Body).Decode(&taskResources)	
+
+	//update the amount of allocated resources of the host this task was running
+	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
+
 }
 
 func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
