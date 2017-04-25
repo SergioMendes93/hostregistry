@@ -162,6 +162,11 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	taskID := params["taskid"]
 	hostIP := params["hostip"] //ip of the host that contained this task
+	taskCPU := params["cpu"]
+	taskMemory := params["memory"]
+
+	cpu,_ := strconv.ParseFloat(taskCPU,64)
+ 	memory,_ := strconv.ParseFloat(taskMemory,64)	
 
 	fmt.Println("killing task " + taskID + " at " + hostIP)
 
@@ -173,8 +178,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 		fmt.Println(err)
 	}
 
-	//no longer updates resources when killing a task because at the scheduler the container will exit  and that also updates resources so it would be updating it twice
-	//go UpdateResources(cpu, memory, hostIP)
+	go UpdateResources(cpu, memory, hostIP)
 }
 
 //function responsible to update task resources when there's a cut. It will also update the allocated cpu/memory of the host
@@ -989,8 +993,11 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	_ = json.NewDecoder(resp.Body).Decode(&taskResources)	
 
 	//update the amount of allocated resources of the host this task was running
-	go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
-
+	//we only update if this wasnt performed before.
+	if taskResources.Memory != -1 {
+		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
+		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
+	}
 }
 
 func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
