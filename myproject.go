@@ -146,15 +146,7 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	cpu,_ := strconv.ParseFloat(taskCPU,64)
  	memory,_ := strconv.ParseFloat(taskMemory,64)	
 
-	fmt.Println("killing task " + taskID + " at " + hostIP)
-
-	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:2376","kill", taskID}
-
-	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker run at kill tasks")
-		fmt.Println(err)
-	}
+	fmt.Println(" task killed " + taskID + " at " + hostIP)
 
 	go UpdateResources(cpu, memory, hostIP)
 }
