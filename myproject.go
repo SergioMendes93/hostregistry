@@ -12,32 +12,11 @@ import (
 	"strconv"	
 	"strings"
 
-	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/scheduler/node"
 	"github.com/gorilla/mux"
 )
 
-// Node is an abstract type used by the scheduler.
-type Node struct {
-	ID         string
-	IP         string
-	Addr       string
-	Name       string
-	Labels     map[string]string
-	Containers cluster.Containers
-	Images     []*cluster.Image
-
-	UsedMemory  int64
-	UsedCpus    int64
-	TotalMemory int64
-	TotalCpus   int64
-
-	HealthIndicator int64
-}
-
 type Host struct {
 	HostIP                    string       `json:"hostip, omitempty"`
-	WorkerNodes               []*node.Node `json:"workernode,omitempty"`
 	HostClass                 string       `json:"hostclass,omitempty"`
 	Region                    string       `json:"region,omitempty"`
 	TotalResourcesUtilization float64       `json:"totalresouces,omitempty"`
@@ -240,18 +219,6 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	regions["LEE"].classHosts["4"] = append(regions["LEE"].classHosts["4"], newHost...)
 	locks["LEE"].classHosts["4"].Unlock()
 
-}
-
-//function used to associate a worker to a host when the worker is created
-func AddWorker(w http.ResponseWriter, req *http.Request) {
-	var newWorker *node.Node
-	_ = json.NewDecoder(req.Body).Decode(&newWorker)
-	addWorker := make([]*node.Node, 0)
-	addWorker = append(addWorker, newWorker)
-
-	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Lock()	
-	hosts[newWorker.IP].WorkerNodes = append([]*node.Node{newWorker},hosts[newWorker.IP].WorkerNodes...)
-	locks[hosts[newWorker.IP].Region].classHosts[hosts[newWorker.IP].HostClass].Unlock()	
 }
 
 //function used to update host class when a new task arrives
@@ -1145,7 +1112,6 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostip}", UpdateHostClass).Methods("GET")
 //	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
 	router.HandleFunc("/host/createhost/{hostip}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
-	router.HandleFunc("/host/addworker/{hostip}&{workerid}", AddWorker).Methods("POST")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}&{hostip}&{cpucut}&{memorycut}", UpdateTaskResources).Methods("GET")
 	router.HandleFunc("/host/killtask/{taskid}&{taskcpu}&{taskmemory}&{hostip}", KillTasks).Methods("GET")
 	router.HandleFunc("/host/reschedule", RescheduleTask).Methods("POST")
