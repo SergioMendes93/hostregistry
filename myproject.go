@@ -11,6 +11,7 @@ import (
 	"math"
 	"strconv"	
 	"strings"
+	"bytes"
 
 	"github.com/gorilla/mux"
 )
@@ -127,12 +128,14 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	fmt.Println("Rescheduling task")
 	fmt.Println(task)
 
-	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image}
+	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, task.Image)
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 
-	if err := exec.Command(cmd, args...).Run(); err != nil {
+	if err := cmd.Run(); err != nil {
 		fmt.Println("Error using docker run at rescheduling")
-		fmt.Println(err)
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 	}
 }
 
@@ -161,14 +164,15 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	cpuCut := params["cpucut"]
 	memoryCut := params["memorycut"]
 
-	//update the task with cut resources
-	cmd := "docker"
-	args := []string{"-H", "tcp://0.0.0.0:2376","update", "-m", newMemory, "-c", newCPU, taskID}
+	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-m", newMemory, "-c", newCPU, taskID)
+        var out, stderr bytes.Buffer
+        cmd.Stdout = &out
+        cmd.Stderr = &stderr
 
-	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker update at update task resources")
-		fmt.Println(err)
-	}
+        if err := cmd.Run(); err != nil {
+                fmt.Println("Error using docker run at update task resources after a cut")
+                fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+        }
 
 	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host
 		
@@ -917,17 +921,18 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	fmt.Println("Warn task registry task id: " + taskID)
 	
 	//this command gets the IP from where the container was running 
-    cmd := "docker"
-    args := []string{"-H", "tcp://0.0.0.0:2376", "inspect", "--format", "{{ .Node.IP }}",taskID }
 
-    var commandOutput []byte 
-    var err error 
-   if commandOutput,err = exec.Command(cmd, args...).Output(); err != nil {
-    	fmt.Println("Error using docker run at warn task registry")
-        fmt.Println(err)
-   }
+	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376",  "inspect", "--format", "{{ .Node.IP }}",taskID)
+        var out, stderr bytes.Buffer
+        cmd.Stdout = &out
+        cmd.Stderr = &stderr
 
-	output := string(commandOutput)
+        if err := cmd.Run(); err != nil {
+                fmt.Println("Error using docker run at inspecting task registry ip (warn task registry)")
+                fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+        }
+
+	output := string(out.Bytes())
 	
 	aux := strings.Split(output,"\n")
 	hostIP := aux[0]
@@ -1000,13 +1005,15 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 
 	//we must update it because of docker swarm bug	
 	if newCPU != "0" {
-		cmd := "docker"
-	    	args := []string{"-H", "tcp://0.0.0.0:2376", "update", "-c", newCPU, taskID}
+		cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-c", newCPU, taskID)
+	        var out, stderr bytes.Buffer
+        	cmd.Stdout = &out
+        	cmd.Stderr = &stderr
 
-    		if err := exec.Command(cmd, args...).Run(); err != nil {
-        		fmt.Println("Error using docker run at updating task when its created")
-        		fmt.Println(err)
-	    	}
+        	if err := cmd.Run(); err != nil {
+                	fmt.Println("Error using docker run at updating task when its create")
+                	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+        	}
 	}
 	fmt.Println("UPDATING RESOURCES OF: " + taskID)
 	go UpdateResources(-auxCPU, -auxMemory, hostIP)
