@@ -203,6 +203,8 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64) 
 	totalCPUs *= 1024 // *1024 because 1024 shares equals using 1 cpu by 100%	
 
+	fmt.Println("New host from " + hostIP)
+
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
 	
 	locks["LEE"].classHosts["4"].Lock()
