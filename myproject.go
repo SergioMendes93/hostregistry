@@ -511,7 +511,6 @@ func GetHostsLEE_cut(requestClass string) []*Host {
 		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
 		locks["LEE"].classHosts["4"].Unlock()
 	}
-
 	return listHosts
 }
 
@@ -966,7 +965,7 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	if taskResources.Update && taskResources.PreviousClass == hosts[hostIP].HostClass {
 		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
-		go UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
+		UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
 	}else {
 		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 	}
@@ -1017,9 +1016,10 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
 	//we must update it because of docker swarm bug	
-	if newCPU != "0" && taskID != "0" {
-		cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-c", newCPU, taskID)
-	        var out, stderr bytes.Buffer
+	if taskID != "0" {
+		if newCPU != "0" {
+			cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-c", newCPU, taskID)
+	       	var out, stderr bytes.Buffer
         	cmd.Stdout = &out
         	cmd.Stderr = &stderr
 
@@ -1027,6 +1027,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
                 	fmt.Println("Error using docker run at updating task when its create")
                 	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
         	}
+		}
 	} else {
 		fmt.Println("UPDATING RESOURCES OF: " + taskID)
 		go UpdateResources(-auxCPU, -auxMemory, hostIP)
