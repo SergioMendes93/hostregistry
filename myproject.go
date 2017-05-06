@@ -31,8 +31,11 @@ type Host struct {
 }
 
 type TaskResources struct {
-	CPU		float64		`json:"cpu, omitempty"`
-	Memory 	float64		`json:"memory,omitempty"`
+	CPU				float64		`json:"cpu, omitempty"`
+	Memory 			float64		`json:"memory,omitempty"`
+	PreviousClass 	string		`json:"previousclass,omitempty"`
+	NewClass 		string		`json:"newclass,omitempty"`
+	Update 			bool		`json:"update,omitempty"`
 }
 
 //this struct is used when a rescheduling is performed
@@ -256,7 +259,7 @@ func InsertHost(classHosts []*Host, index int, host *Host) []*Host {
 //this function needs to remove the host from its previous class and update it to the new
 func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 
-	fmt.Println("Updating host class  previous class: " + hostPreviousClass)
+	fmt.Println("Updating host class " + host.HostIP + " previous class: " + hostPreviousClass)
 	fmt.Println("before new class deletion")
 	fmt.Println(regions[host.Region].classHosts[hostPreviousClass])
 
@@ -957,10 +960,13 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	var taskResources *TaskResources
 	_ = json.NewDecoder(resp.Body).Decode(&taskResources)	
 
+	//we must check if host class should be updated. Could be last task restraining host class (e.g. last  class 1 task)
+	if taskResources.Update {
+		UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
+	}
+
 	//update the amount of allocated resources of the host this task was running
 	//we only update if this wasnt performed before.
-
-
 	if taskResources.Memory != -1.0 {
 		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 	} else {
