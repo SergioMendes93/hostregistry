@@ -234,7 +234,6 @@ func UpdateHostClass(w http.ResponseWriter, req *http.Request) {
 	locks[hosts[hostIP].Region].classHosts[currentClass].Lock()
 
 	if currentClass > newHostClass { //we only update the host class if the current class is higher
-		hosts[hostIP].HostClass = newHostClass
 		locks[hosts[hostIP].Region].classHosts[currentClass].Unlock()
 		//we need to update the list where this host is at
 		UpdateHostList(currentClass, newHostClass, hosts[hostIP])
@@ -292,12 +291,13 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 		index := Sort(regions[host.Region].classHosts[hostNewClass], host.TotalResourcesUtilization)
 		regions[host.Region].classHosts[hostNewClass] = InsertHost(regions[host.Region].classHosts[hostNewClass], index, host)
 	}
+	hosts[host.HostIP].HostClass = hostNewClass
+
 	fmt.Println("after new class insertion")
      //FOR DEBUG
         for i := 0 ; i < len(regions[host.Region].classHosts[hostNewClass]); i++ {
             fmt.Println( regions[host.Region].classHosts[hostNewClass][i])
         }
-
 
 	locks[host.Region].classHosts[hostNewClass].Unlock()
 
@@ -309,7 +309,6 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
 	oldRegion := hosts[hostIP].Region
 	
-	hosts[hostIP].Region = newRegion
 	locks[oldRegion].classHosts[hosts[hostIP].HostClass].Unlock()
 
 	UpdateHostRegionList(oldRegion, newRegion, hosts[hostIP])
@@ -348,6 +347,8 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 		index := Sort(regions[newRegion].classHosts[host.HostClass], host.TotalResourcesUtilization)
 		regions[newRegion].classHosts[host.HostClass] = InsertHost(regions[newRegion].classHosts[host.HostClass], index, host)
 	}
+
+	hosts[host.HostIP].Region = newRegion
 
 	fmt.Println("after new region")
 		//FOR DEBUG
