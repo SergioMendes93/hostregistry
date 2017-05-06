@@ -961,8 +961,10 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	_ = json.NewDecoder(resp.Body).Decode(&taskResources)	
 
 	//we must check if host class should be updated. Could be last task restraining host class (e.g. last  class 1 task)
-	if taskResources.Update {
-		UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
+	locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Lock()
+	if taskResources.Update && taskResources.PreviousClass == hosts[hostIP].HostClass {
+		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
+		go UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
 	}
 
 	//update the amount of allocated resources of the host this task was running
@@ -981,7 +983,6 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	fmt.Println("Before (UpdateResources) " + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
-
 
     hosts[hostIP].AllocatedMemory -= memoryUpdate
     hosts[hostIP].AllocatedCPUs -= cpuUpdate
