@@ -965,6 +965,8 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 	if taskResources.Update && taskResources.PreviousClass == hosts[hostIP].HostClass {
 		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 		go UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
+	}else {
+		locks[hosts[hostIP].Region].classHosts[hosts[hostIP].HostClass].Unlock()
 	}
 
 	//update the amount of allocated resources of the host this task was running
