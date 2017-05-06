@@ -1017,7 +1017,7 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
 
 	//we must update it because of docker swarm bug	
-	if newCPU != "0" {
+	if newCPU != "0" && taskID != "0" {
 		cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-c", newCPU, taskID)
 	        var out, stderr bytes.Buffer
         	cmd.Stdout = &out
@@ -1027,9 +1027,10 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
                 	fmt.Println("Error using docker run at updating task when its create")
                 	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
         	}
+	} else {
+		fmt.Println("UPDATING RESOURCES OF: " + taskID)
+		go UpdateResources(-auxCPU, -auxMemory, hostIP)
 	}
-	fmt.Println("UPDATING RESOURCES OF: " + taskID)
-	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
 
