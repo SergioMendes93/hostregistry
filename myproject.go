@@ -462,61 +462,33 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 
 //for CUT algorithm
 func GetHostsLEE_cut(requestClass string) []*Host {
-	//we only get hosts that respect requestClass <= hostClass and order them by ascending order of their class
-	//class 1 hosts are always selected
+	//we get all the hosts because the incoming request could fit in any if it receives a cut. However we only check tasks to cut where requestClass <= hostClass
+	//because at the other hosts there won't be probably anything we can cut so its not waste to cost of searching them.
 
 	listHosts := make([]*Host, 0)
 
-	if requestClass == "1" {
-		locks["LEE"].classHosts["1"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
-		locks["LEE"].classHosts["1"].Unlock()
+	locks["LEE"].classHosts["1"].Lock()
+	listHosts = append(listHosts, regions["LEE"].classHosts["1"]...)
+	locks["LEE"].classHosts["1"].Unlock()
 
-		locks["LEE"].classHosts["2"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
+	locks["LEE"].classHosts["2"].Lock()
+	listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
+	locks["LEE"].classHosts["2"].Unlock()
 		
-		locks["LEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
+	locks["LEE"].classHosts["3"].Lock()
+	listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
+	locks["LEE"].classHosts["3"].Unlock()
 		
-		locks["LEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
+	locks["LEE"].classHosts["4"].Lock()
+	listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
+	locks["LEE"].classHosts["4"].Unlock()
 
-	} else if requestClass == "2" {
-		locks["LEE"].classHosts["2"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["2"]...)
-		locks["LEE"].classHosts["2"].Unlock()
-
-		locks["LEE"].classHosts["3"].Lock()	
-		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
-		locks["LEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-	} else if requestClass == "3" {
-		locks["LEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["3"]...)
-		locks["LEE"].classHosts["3"].Unlock()
-
-
-		locks["LEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-
-	} else if requestClass == "4" {
-		locks["LEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["LEE"].classHosts["4"]...)
-		locks["LEE"].classHosts["4"].Unlock()
-	}
 	return listHosts
 }
 
 //for initial scheduling algori
 func GetHostsDEE_normal(requestClass string) []*Host {
-	//we only get hosts that respect requestClass <= hostClass and order them by ascending order of their class
+	//we only get hosts that respect requestClass >= hostClass and order them by ascending order of their class
 	//class 1 hosts are always selected
 	listHosts := make([]*Host, 0)
 
@@ -568,52 +540,27 @@ func GetHostsDEE_normal(requestClass string) []*Host {
 
 //for CUT algorithm
 func GetHostsDEE_cut(requestClass string) []*Host {
-	//we only get hosts that respect requestClass <= hostClass and order them by ascending order of their class
-	//class 1 hosts are always selected
+	//we get all the hosts because the incoming request could fit in any if it receives a cut. However we only check tasks to cut where requestClass <= hostClass
+	//because at the other hosts there won't be probably anything we can cut so its not waste to cost of searching them.
+
 	listHosts := make([]*Host, 0)
-	if requestClass == "1" {
-		locks["DEE"].classHosts["1"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
-		locks["DEE"].classHosts["1"].Unlock()
+	
+	locks["DEE"].classHosts["1"].Lock()
+	listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
+	locks["DEE"].classHosts["1"].Unlock()
 
-		locks["DEE"].classHosts["2"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
+	locks["DEE"].classHosts["2"].Lock()
+	listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
+	locks["DEE"].classHosts["2"].Unlock()
 
-		locks["DEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
+	locks["DEE"].classHosts["3"].Lock()
+	listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
+	locks["DEE"].classHosts["3"].Unlock()
 
-		locks["DEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
+	locks["DEE"].classHosts["4"].Lock()
+	listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
+	locks["DEE"].classHosts["4"].Unlock()
 
-	} else if requestClass == "2" {
-		locks["DEE"].classHosts["2"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["2"]...)
-		locks["DEE"].classHosts["2"].Unlock()
-
-		locks["DEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-
-	} else if requestClass == "3" {
-		locks["DEE"].classHosts["3"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["3"]...)
-		locks["DEE"].classHosts["3"].Unlock()
-
-		locks["DEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-	} else if requestClass == "4" {
-		locks["DEE"].classHosts["4"].Lock()
-		listHosts = append(listHosts, regions["DEE"].classHosts["4"]...)
-		locks["DEE"].classHosts["4"].Unlock()
-	}
 	return listHosts
 }
 
