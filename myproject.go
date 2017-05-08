@@ -20,19 +20,19 @@ type Host struct {
 	HostIP                    string       `json:"hostip, omitempty"`
 	HostClass                 string       `json:"hostclass,omitempty"`
 	Region                    string       `json:"region,omitempty"`
-	TotalResourcesUtilization float64       `json:"totalresouces,omitempty"`
-	CPU_Utilization           float64       `json:"cpu,omitempty"`
-	MemoryUtilization         float64       `json:"memory,omitempty"`
-	AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
-	AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
+	TotalResourcesUtilization float64      `json:"totalresouces,omitempty"`
+	CPU_Utilization           float64      `json:"cpu,omitempty"`
+	MemoryUtilization         float64      `json:"memory,omitempty"`
+	AllocatedMemory           int64        `json:"allocatedmemory,omitempty"`
+	AllocatedCPUs             int64        `json:"allocatedcpus,omitempty"`
 	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
-	TotalMemory				  float64	   `json:"totalmemory,omitempty"`
-	TotalCPUs				  float64	   `json:"totalcpus, omitempty"`
+	TotalMemory				  int64	       `json:"totalmemory,omitempty"`
+	TotalCPUs				  int64	       `json:"totalcpus, omitempty"`
 }
 
 type TaskResources struct {
-	CPU				float64		`json:"cpu, omitempty"`
-	Memory 			float64		`json:"memory,omitempty"`
+	CPU				int64		`json:"cpu, omitempty"`
+	Memory 			int64		`json:"memory,omitempty"`
 	PreviousClass 	string		`json:"previousclass,omitempty"`
 	NewClass 		string		`json:"newclass,omitempty"`
 	Update 			bool		`json:"update,omitempty"`
@@ -150,8 +150,8 @@ func KillTasks(w http.ResponseWriter, req *http.Request) {
 	taskCPU := params["taskcpu"]
 	taskMemory := params["taskmemory"]
 
-	cpu,_ := strconv.ParseFloat(taskCPU,64)
- 	memory,_ := strconv.ParseFloat(taskMemory,64)	
+	cpu,_ := strconv.ParseInt(taskCPU,10,64)
+ 	memory,_ := strconv.ParseInt(taskMemory,10,64)	
 
 	fmt.Println(" task killed " + taskID + " at " + hostIP)
 
@@ -180,8 +180,8 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 
 	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host
 		
-	memoryReduction, _ := strconv.ParseFloat(memoryCut,64)
-	cpuReduction, _ := strconv.ParseFloat(cpuCut,64)
+	memoryReduction, _ := strconv.ParseInt(memoryCut,10,64)
+	cpuReduction, _ := strconv.ParseInt(cpuCut,10,64)
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
 
@@ -204,8 +204,8 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 func CreateHost(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	hostIP := params["hostip"]
-	totalMemory,_ := strconv.ParseFloat(params["totalmemory"],64)
-	totalCPUs,_ := strconv.ParseFloat(params["totalcpu"],64) 
+	totalMemory,_ := strconv.ParseInt(params["totalmemory"],10,64)
+	totalCPUs,_ := strconv.ParseInt(params["totalcpu"],10,64) 
 	totalCPUs *= 1024 // *1024 because 1024 shares equals using 1 cpu by 100%	
 
 	fmt.Println("New host from " + hostIP)
@@ -213,7 +213,7 @@ func CreateHost(w http.ResponseWriter, req *http.Request) {
 	//since a host is created it will not have tasks assigned to it so it goes to the LEE region to the less restrictive class
 	
 	locks["LEE"].classHosts["4"].Lock()
-	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0.0, AllocatedCPUs: 0.0,
+	hosts[hostIP] = &Host{HostIP: hostIP, HostClass: "4", Region: "LEE", TotalMemory: totalMemory, TotalCPUs: totalCPUs, AllocatedMemory: 0, AllocatedCPUs: 0,
 	TotalResourcesUtilization: 0.0, CPU_Utilization: 0.0, MemoryUtilization: 0.0, OverbookingFactor:0.0}
 	
 	newHost := make([]*Host, 0)
@@ -934,14 +934,14 @@ func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
 
 	//update the amount of allocated resources of the host this task was running
 	//we only update if this wasnt performed before.
-	if taskResources.Memory != -1.0 {
+	if taskResources.Memory != -1 {
 		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
 	} else {
 		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
 	}
 }
 
-func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
+func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
     
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
@@ -960,8 +960,8 @@ func UpdateResources(cpuUpdate float64, memoryUpdate float64, hostIP string) {
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
 	//update overbooking of this host
-	cpuOverbooking := hosts[hostIP].AllocatedCPUs / hosts[hostIP].TotalCPUs
-    memoryOverbooking := hosts[hostIP].AllocatedMemory / hosts[hostIP].TotalMemory
+	cpuOverbooking := float64(hosts[hostIP].AllocatedCPUs) / float64(hosts[hostIP].TotalCPUs)
+    memoryOverbooking := float64(hosts[hostIP].AllocatedMemory) / float64(hosts[hostIP].TotalMemory)
 
     hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
     locks[hostRegion].classHosts[hostClass].Unlock()
@@ -977,8 +977,8 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	newMemory := params["memory"]
 	taskID := params["taskid"]
 
-	auxCPU,_ := strconv.ParseFloat(newCPU, 64)
-	auxMemory,_ := strconv.ParseFloat(newMemory, 64)
+	auxCPU,_ := strconv.ParseInt(newCPU,10, 64)
+	auxMemory,_ := strconv.ParseInt(newMemory,10, 64)
 
 	//we must update it because of docker swarm bug	
 	if taskID != "0" {
