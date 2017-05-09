@@ -881,6 +881,7 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 
 func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
     
+	fmt.Println("Receiveing from IP " + hostIP)
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
 
