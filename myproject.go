@@ -10,7 +10,6 @@ import (
 	"sync"
 	"math"
 	"strconv"	
-	"strings"
 	"bytes"
 
 	"github.com/gorilla/mux"
@@ -26,16 +25,17 @@ type Host struct {
 	AllocatedMemory           int64        `json:"allocatedmemory,omitempty"`
 	AllocatedCPUs             int64        `json:"allocatedcpus,omitempty"`
 	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
-	TotalMemory				  int64	       `json:"totalmemory,omitempty"`
-	TotalCPUs				  int64	       `json:"totalcpus, omitempty"`
+	TotalMemory		  int64	       `json:"totalmemory,omitempty"`
+	TotalCPUs		  int64	       `json:"totalcpus, omitempty"`
 }
 
 type TaskResources struct {
-	CPU				int64		`json:"cpu, omitempty"`
+	CPU			int64		`json:"cpu, omitempty"`
 	Memory 			int64		`json:"memory,omitempty"`
-	PreviousClass 	string		`json:"previousclass,omitempty"`
+	PreviousClass 		string		`json:"previousclass,omitempty"`
 	NewClass 		string		`json:"newclass,omitempty"`
 	Update 			bool		`json:"update,omitempty"`
+	IP			string		`json:"ip,omitempty"`
 }
 
 //this struct is used when a rescheduling is performed
@@ -125,7 +125,6 @@ func ReverseSort(classList []*Host, searchValue float64) int {
 }
 
 func RescheduleTask(w http.ResponseWriter, req *http.Request) {
-
 	var task Task
 	_ = json.NewDecoder(req.Body).Decode(&task)	
 
@@ -143,19 +142,26 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func KillTasks(w http.ResponseWriter, req *http.Request) {
-	params := mux.Vars(req)
-	taskID := params["taskid"]
-	hostIP := params["hostip"] //ip of the host that contained this task
-	taskCPU := params["taskcpu"]
-	taskMemory := params["taskmemory"]
+func TaskTerminated(w http.ResponseWriter, req *http.Request) {
+	var taskResources *TaskResources
+	_ = json.NewDecoder(req.Body).Decode(&taskResources)
 
-	cpu,_ := strconv.ParseInt(taskCPU,10,64)
- 	memory,_ := strconv.ParseInt(taskMemory,10,64)	
+	hostIP := taskResources.IP
 
-	fmt.Println(" task killed " + taskID + " at " + hostIP)
+	hostRegion := hosts[hostIP].Region
+	hostClass := hosts[hostIP].HostClass
 
-	go UpdateResources(cpu, memory, hostIP)
+	//update resources of this host. It will have less resources since a task has terminated
+	UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
+
+	//we must check if host class should be updated. Could be last task restraining host class (e.g. last  class 1 task)
+	locks[hostRegion].classHosts[hostClass].Lock()
+	if taskResources.Update && taskResources.PreviousClass == hostClass {
+		locks[hostRegion].classHosts[hostClass].Unlock()
+		go UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
+	}else {
+		locks[hostRegion].classHosts[hostClass].Unlock()
+	}
 }
 
 //function responsible to update task resources when there's a cut. It will also update the allocated cpu/memory of the host
@@ -185,20 +191,20 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
 
-    locks[hostRegion].classHosts[hostClass].Lock()
+	locks[hostRegion].classHosts[hostClass].Lock()
   
 	fmt.Println("cutting task, resources before " + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
   
-    hosts[hostIP].AllocatedMemory -= memoryReduction
-    hosts[hostIP].AllocatedCPUs -= cpuReduction
+    	hosts[hostIP].AllocatedMemory -= memoryReduction
+    	hosts[hostIP].AllocatedCPUs -= cpuReduction
 
 	fmt.Println("cutting task, resources after " + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
-    locks[hostRegion].classHosts[hostClass].Unlock()
+    	locks[hostRegion].classHosts[hostClass].Unlock()
 }
 
 func CreateHost(w http.ResponseWriter, req *http.Request) {
@@ -640,7 +646,6 @@ func GetHostsDEE_kill(requestClass string) []*Host {
 		locks["DEE"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["DEE"].classHosts["1"]...)
 		locks["DEE"].classHosts["1"].Unlock()
-
 		break
 	}
 	return listHosts
@@ -666,7 +671,6 @@ func GetHostsEED(requestClass string) []*Host {
 		locks["EED"].classHosts["4"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["4"]...)
 		locks["EED"].classHosts["4"].Unlock()
-
 		break
 	case "2":
 		locks["EED"].classHosts["2"].Lock()
@@ -701,7 +705,6 @@ func GetHostsEED(requestClass string) []*Host {
 		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
 		locks["EED"].classHosts["1"].Unlock()
-
 		break
 	case "4":
 		locks["EED"].classHosts["4"].Lock()
@@ -719,7 +722,6 @@ func GetHostsEED(requestClass string) []*Host {
 		locks["EED"].classHosts["1"].Lock()
 		listHosts = append(listHosts, regions["EED"].classHosts["1"]...)
 		locks["EED"].classHosts["1"].Unlock()
-
 		break
 	}
 	return listHosts
@@ -811,7 +813,6 @@ func CheckIfRegionUpdate(hostIP string) bool {
 
 			fmt.Println("Region UPDATE LEE")
 			fmt.Println(hostIP)
-
 			return true
 		}
 	} else if hosts[hostIP].TotalResourcesUtilization < 0.85 { //DEE region
@@ -821,7 +822,6 @@ func CheckIfRegionUpdate(hostIP string) bool {
 
 			fmt.Println("Region UPDATE DEE")
 			fmt.Println(hostIP)
-
 			return true
 		}
 	} else { //EED region
@@ -831,7 +831,6 @@ func CheckIfRegionUpdate(hostIP string) bool {
 
 			fmt.Println("Region UPDATE EED")
 			fmt.Println(hostIP)
-
 			return true
 		}
 	}
@@ -880,67 +879,6 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	go UpdateTotalResourcesUtilization(0.0, memoryToUpdate, 3, hostIP)
 }
 
-//this function is responsible for receiving by the Scheduler the task that has ended and warn the task registry it no longer exists
-//it will also reduce the amount of allocated resources on the host it used to run
-
-func WarnTaskRegistry(w http.ResponseWriter, req *http.Request){
-	params := mux.Vars(req)
-	taskID := params["taskid"]
-
-	fmt.Println("Warn task registry task id: " + taskID)
-	
-	//this command gets the IP from where the container was running 
-	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376",  "inspect", "--format", "{{ .Node.IP }}",taskID)
-        var out, stderr bytes.Buffer
-        cmd.Stdout = &out
-        cmd.Stderr = &stderr
-
-        if err := cmd.Run(); err != nil {
-                fmt.Println("Error using docker run at inspecting task registry ip (warn task registry)")
-                fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-        }
-
-	output := string(out.Bytes())
-	aux := strings.Split(output,"\n")
-	hostIP := aux[0]
-
-	//this code alerts task registry that the task must be removed. This must return as response the amount of resources this task was consuming so 
-	//it can be taken from the allocatedMemory/CPUs
-	req, err1 := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+taskID, nil)
-	req.Header.Set("X-Custom-Header", "myvalue")
-	req.Header.Set("Content-Type", "application/json")
-
-    client := &http.Client{}
-    resp, err1 := client.Do(req)
-    if err1 != nil {
-    	panic(err1)
-    }
-	defer resp.Body.Close()
-
-	var taskResources *TaskResources
-	_ = json.NewDecoder(resp.Body).Decode(&taskResources)	
-
-	hostRegion := hosts[hostIP].Region
-	hostClass := hosts[hostIP].HostClass
-
-	//we must check if host class should be updated. Could be last task restraining host class (e.g. last  class 1 task)
-	locks[hostRegion].classHosts[hostClass].Lock()
-	if taskResources.Update && taskResources.PreviousClass == hostClass {
-		locks[hostRegion].classHosts[hostClass].Unlock()
-		UpdateHostList(taskResources.PreviousClass, taskResources.NewClass, hosts[hostIP])	
-	}else {
-		locks[hostRegion].classHosts[hostClass].Unlock()
-	}
-
-	//update the amount of allocated resources of the host this task was running
-	//we only update if this wasnt performed before.
-	if taskResources.Memory != -1 {
-		go UpdateResources(taskResources.CPU, taskResources.Memory, hostIP)
-	} else {
-		fmt.Println("NOT UPDATING RESOURCES, ALREADY DELETED THEM")
-	}
-}
-
 func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
     
 	hostRegion := hosts[hostIP].Region
@@ -952,8 +890,8 @@ func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
 	fmt.Println(hosts[hostIP].AllocatedMemory)
 	fmt.Println(hosts[hostIP].AllocatedCPUs)
 
-    hosts[hostIP].AllocatedMemory -= memoryUpdate
-    hosts[hostIP].AllocatedCPUs -= cpuUpdate
+    	hosts[hostIP].AllocatedMemory -= memoryUpdate
+    	hosts[hostIP].AllocatedCPUs -= cpuUpdate
 
 	fmt.Println("After (UpdateResources)" + hostIP)
 	fmt.Println(hosts[hostIP].AllocatedMemory)
@@ -961,10 +899,10 @@ func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
 
 	//update overbooking of this host
 	cpuOverbooking := float64(hosts[hostIP].AllocatedCPUs) / float64(hosts[hostIP].TotalCPUs)
-    memoryOverbooking := float64(hosts[hostIP].AllocatedMemory) / float64(hosts[hostIP].TotalMemory)
+    	memoryOverbooking := float64(hosts[hostIP].AllocatedMemory) / float64(hosts[hostIP].TotalMemory)
 
-    hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
-    locks[hostRegion].classHosts[hostClass].Unlock()
+    	hosts[hostIP].OverbookingFactor = math.Max(cpuOverbooking, memoryOverbooking)
+    	locks[hostRegion].classHosts[hostClass].Unlock()
 }
 
 //updates information about allocated resources and recalculates overbooking factor.
@@ -1008,21 +946,8 @@ func main() {
 	ServeSchedulerRequests()
 }
 
-func assignHosts(){
-	/*hosts["0"] = &Host{HostID: "0", HostIP: "192.168.1.170", HostClass: "1", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}
-	hosts["2"] = &Host{HostID: "2", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.45"}
-	hosts["3"] = &Host{HostID: "3", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.37"}
-	hosts["4"] = &Host{HostID: "4", HostClass: "1", Region: "LEE", TotalMemory: 50000000000, TotalCPUs: 50000000000, TotalResourcesUtilization:"0.33"}
-	hosts["5"] = &Host{HostID: "5", HostClass: "2", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["7"] = &Host{HostID: "7", HostClass: "1", Region: "EED", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["8"] = &Host{HostID: "8", HostClass: "1", Region: "DEE", TotalMemory: 50000000000, TotalCPUs: 50000000000}
-	hosts["1"] = &Host{HostID: "1", HostClass: "2", Region: "LEE", TotalMemory: 5000000, TotalCPUs: 50000000}*/
-}
-
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
-	//assignHosts()
-
 
 	lockClassLEE := make(map[string]*sync.Mutex)
 	lockClassDEE := make(map[string]*sync.Mutex)
@@ -1052,57 +977,22 @@ func ServeSchedulerRequests() {
 	classDEE := make(map[string][]*Host)
 	classEED := make(map[string][]*Host)
 
-/*	list1LEE := make([]*Host, 0)
-	list1DEE := make([]*Host, 0)
-	list1EED := make([]*Host, 0)
-	list2LEE := make([]*Host, 0)
-	list2DEE := make([]*Host, 0)
-//	list3 := make([]*Host, 0)
-//	list4 := make([]*Host, 0)
-
-	list1LEE = append(list1LEE, hosts["2"])
-	list1LEE = append(list1LEE, hosts["3"])
-	list1LEE = append(list1LEE, hosts["4"])
-	list1LEE = append(list1LEE, hosts["0"])
-
-	//list2LEE = append(list2LEE, hosts["1"])
-	//list3 = append(list3, hosts["2"])
-	//list4 = append(list4, hosts["3"])
-	list2DEE = append(list2DEE, hosts["5"])
-	list1EED = append(list1EED, hosts["7"])
-	list1DEE = append(list1DEE, hosts["8"])
-	list2LEE = append(list2LEE, hosts["1"])
-
-	classLEE["1"] = list1LEE
-	classLEE["2"] = list2LEE
-	//classLEE["3"] = list3
-	//classLEE["4"] = list4
-	classDEE["1"] = list1DEE
-	classDEE["2"] = list2DEE
-	classEED["1"] = list1EED
-*/
 	regions["LEE"] = Region{classLEE}
 	regions["DEE"] = Region{classDEE}
 	regions["EED"] = Region{classEED}
 
-	//	router.HandleFunc("/host/{hostid}", GetHost).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}", GetListHostsLEE_DEE).Methods("GET")
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostip}", UpdateHostClass).Methods("GET")
-//	router.HandleFunc("/host/createhost", CreateHost).Methods("POST")
 	router.HandleFunc("/host/createhost/{hostip}&{totalmemory}&{totalcpu}", CreateHost).Methods("GET")
 	router.HandleFunc("/host/updatetask/{taskid}&{newcpu}&{newmemory}&{hostip}&{cpucut}&{memorycut}", UpdateTaskResources).Methods("GET")
-	router.HandleFunc("/host/killtask/{taskid}&{taskcpu}&{taskmemory}&{hostip}", KillTasks).Methods("GET")
+	router.HandleFunc("/host/killtask", TaskTerminated).Methods("POST")
 	router.HandleFunc("/host/reschedule", RescheduleTask).Methods("POST")
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
 	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}&{taskid}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
-	router.HandleFunc("/host/deletetask/{taskid}", WarnTaskRegistry).Methods("GET")
 
-	//	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
-	//	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
-	//	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(getIPAddress()+":12345", router))
 }
 
