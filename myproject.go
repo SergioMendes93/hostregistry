@@ -913,28 +913,11 @@ func UpdateAllocatedResourcesAndOverbooking(w http.ResponseWriter, req *http.Req
 	hostIP := params["hostip"]
 	newCPU := params["cpu"]
 	newMemory := params["memory"]
-	taskID := params["taskid"]
 
 	auxCPU,_ := strconv.ParseInt(newCPU,10, 64)
 	auxMemory,_ := strconv.ParseInt(newMemory,10, 64)
 
-	//we must update it because of docker swarm bug	
-	if taskID != "0" {
-		if newCPU != "0" {
-			cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","update", "-c", newCPU, taskID)
-	       	var out, stderr bytes.Buffer
-        	cmd.Stdout = &out
-        	cmd.Stderr = &stderr
-
-        	if err := cmd.Run(); err != nil {
-                	fmt.Println("Error using docker run at updating task when its create")
-                	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-        	}
-		}
-	} else {
-		fmt.Println("UPDATING RESOURCES OF: " + taskID)
-		go UpdateResources(-auxCPU, -auxMemory, hostIP)
-	}
+	go UpdateResources(-auxCPU, -auxMemory, hostIP)
 }
 
 
@@ -991,7 +974,7 @@ func ServeSchedulerRequests() {
 	router.HandleFunc("/host/updateboth/{hostip}&{cpu}&{memory}", UpdateBothResources).Methods("GET")
 	router.HandleFunc("/host/updatecpu/{hostip}&{cpu}", UpdateCPU).Methods("GET")
 	router.HandleFunc("/host/updatememory/{hostip}&{memory}", UpdateMemory).Methods("GET")
-	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}&{taskid}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
+	router.HandleFunc("/host/updateresources/{hostip}&{cpu}&{memory}", UpdateAllocatedResourcesAndOverbooking).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(getIPAddress()+":12345", router))
 }
