@@ -128,7 +128,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	var task Task
 	_ = json.NewDecoder(req.Body).Decode(&task)	
 
-	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image)
+	cmd := exec.Command("docker","-H", "tcp://0.0.0.0:2376","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "-e", "affinity:rescheduled==yes", task.Image)
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
