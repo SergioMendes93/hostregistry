@@ -11,6 +11,7 @@ import (
 	"strconv"	
 	"bytes"
 	"fmt"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -694,6 +695,24 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 	go UpdateTotalResourcesUtilization(cpuToUpdate, memoryToUpdate, 1, hostIP)
 }
 
+//benchmark: gathers data regarding cpu and memory utilization of host for post analysis
+func GatherData(cpu float64, memory float64, hostIP string) {
+	//write the data gathered to a file
+	// open files r and w
+	cpuUtilization := strconv.FormatFloat(cpu,'f', -1, 64)
+	memoryUtilization := strconv.FormatFloat(memory,'f', -1, 64)
+
+     	file, err := os.OpenFile(hostIP+"Resources.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY,0600)
+     	if err != nil {
+       		panic(err)
+     	}
+     		defer file.Close()
+
+     	if _, err = file.WriteString("CPU:" + cpuUtilization + " Memory:" + memoryUtilization); err != nil {
+      		panic(err)
+     	}
+}
+
 //function whose job is to check whether the total resources should be updated or not.
 func UpdateTotalResourcesUtilization(cpu float64, memory float64, updateType int, hostIP string){
 	//this will be used in case there is no region change to avoid updating the host position in its current region if its total has not changed
@@ -702,6 +721,12 @@ func UpdateTotalResourcesUtilization(cpu float64, memory float64, updateType int
 
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
+
+	//benchmark purposes, gathering data
+	locks[hostRegion].classHosts[hostClass].Lock()
+        GatherData(hosts[hostIP].CPU_Utilization, hosts[hostIP].MemoryUtilization, hostIP)
+        locks[hostRegion].classHosts[hostClass].Unlock()
+
 
 	//1-> both resources, 2-> cpu, 3-> memory
 	switch updateType {
