@@ -922,12 +922,14 @@ func getIPAddress() string {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+	count := 0
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
+			if ipnet.IP.To4() != nil && count == 1{
 				fmt.Println(ipnet.IP.String())
 				return ipnet.IP.String()
 			}
+			count++
 		}
 	}
 	return ""
