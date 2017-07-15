@@ -707,15 +707,21 @@ func GatherData(cpu float64, memory float64, hostIP string) {
 	cpuUtilization := strconv.FormatFloat(cpu,'f', -1, 64)
 	memoryUtilization := strconv.FormatFloat(memory,'f', -1, 64)
 
-     	file, err := os.OpenFile(hostIP+"Resources.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY,0600)
-     	if err != nil {
-       		panic(err)
+     	fileCPU, err1 := os.OpenFile(hostIP+"cpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+     	fileMemory, err2 := os.OpenFile(hostIP+"memory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+     	if err1 != nil || err2 != nil{
+       		panic(err1)
      	}
-     		defer file.Close()
+        defer fileCPU.Close()
+        defer fileMemory.Close()
 
-     	if _, err = file.WriteString("CPU:" + cpuUtilization + " Memory:" + memoryUtilization); err != nil {
-      		panic(err)
+     	if _, err1 = fileCPU.WriteString(cpuUtilization); err1 != nil {
+      		panic(err1)
      	}
+     	if _, err2 = fileMemory.WriteString(memoryUtilization); err2 != nil {
+      		panic(err2)
+     	}
+
 }
 
 //function whose job is to check whether the total resources should be updated or not.
