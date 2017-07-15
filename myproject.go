@@ -715,10 +715,10 @@ func GatherData(cpu float64, memory float64, hostIP string) {
         defer fileCPU.Close()
         defer fileMemory.Close()
 
-     	if _, err1 = fileCPU.WriteString(cpuUtilization); err1 != nil {
+     	if _, err1 = fileCPU.WriteString(cpuUtilization+"\n"); err1 != nil {
       		panic(err1)
      	}
-     	if _, err2 = fileMemory.WriteString(memoryUtilization); err2 != nil {
+     	if _, err2 = fileMemory.WriteString(memoryUtilization+"\n"); err2 != nil {
       		panic(err2)
      	}
 
