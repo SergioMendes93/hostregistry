@@ -707,8 +707,8 @@ func GatherData(cpu float64, memory float64, hostIP string) {
 	cpuUtilization := strconv.FormatFloat(cpu,'f', -1, 64)
 	memoryUtilization := strconv.FormatFloat(memory,'f', -1, 64)
 
-     	fileCPU, err1 := os.OpenFile(hostIP+"cpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-     	fileMemory, err2 := os.OpenFile(hostIP+"memory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+     	fileCPU, err1 := os.OpenFile(hostIP+"EnergyCpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+     	fileMemory, err2 := os.OpenFile(hostIP+"EnergyMemory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
      	if err1 != nil || err2 != nil{
        		panic(err1)
      	}
