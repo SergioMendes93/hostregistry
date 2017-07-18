@@ -147,7 +147,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	} else if task.Image == "sergiomendes/timeserver" {
-		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, portNumberAux)
+		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "sergiomendes/timeserver", portNumberAux)
 		portNumber++
 		var out, stderr bytes.Buffer
 		cmd.Stdout = &out
@@ -167,6 +167,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("Error using docker run at rescheduling: ffmpeg")
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
+		fmt.Println("rescheduled ffmpeg")
 	} else if task.Image == "enhance" {
 		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/ne/input", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:makespan==150", "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "alexjc/neural-enhance", "--zoom=2", "input/macos.jpg")
 		var out, stderr bytes.Buffer
@@ -177,6 +178,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("Error using docker run at rescheduling: enhance")
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
+		fmt.Println("rescheduled enhance")
 	}
 
 	//cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "-e", "affinity:rescheduled==yes", task.Image)
