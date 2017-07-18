@@ -172,6 +172,9 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	cpuCut := params["cpucut"]
 	memoryCut := params["memorycut"]
 
+	fmt.Println("Cutting")
+	fmt.Println("newCPU: " + newCPU + " newMemory: " + newMemory + " at host: " + hostIP + " cpuCUT: " + cpuCut + " memoryCut: " + memoryCut)
+
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
         cmd.Stdout = &out
