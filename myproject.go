@@ -65,6 +65,9 @@ var regions map[string]Region
 var hosts map[string]*Host
 
 var locks map[string]Lock //for locking access to regions/class
+var lockUpdate *sync.Mutex
+
+var portNumber = 11000
 
 //adapted binary search algorithm for inserting orderly based on total resources of a host
 //this is ascending order (for EED region)
@@ -129,14 +132,55 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	var task Task
 	_ = json.NewDecoder(req.Body).Decode(&task)	
 
-	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "-e", "affinity:rescheduled==yes", task.Image)
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+	portNumberAux := strconv.Itoa(portNumber)
 
-	if err := cmd.Run(); err != nil {
-		fmt.Println("Error using docker run at rescheduling")
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	if task.Image == "redis" {
+		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU , "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image,  "--port", portNumberAux);	
+		portNumber++
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+	
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Error using docker run at rescheduling: redis")
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		}
+	} else if task.Image == "sergiomendes/timeserver" {
+		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, portNumberAux);	
+		portNumber++
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+	
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Error using docker run at rescheduling: timeserver")
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		}
+	} else if task.Image == "ffmpeg" {
+		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/tmp/workdir", "-w=/tmp/workdir", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:makespan==150", "-e", "affinity:requesttype==" + task.TaskType, "jrottenberg/ffmpeg", "-i", "dead.avi", "-r", "100", "-b", "700k", "-qscale", "0", "-ab", "160k", "-ar", "44100", "result"+portNumberAux+".dvd", "-y");
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+	
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Error using docker run at rescheduling: ffmpeg")
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		}
+	} else if task.Image == "enhance" {
+		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/ne/input", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:makespan==150", "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "alexjc/neural-enhance", "--zoom=2", "input/macos.jpg");
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+	
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Error using docker run at rescheduling: enhance")
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		}
+	}
+
+	//cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "-e", "affinity:rescheduled==yes", task.Image)
+	if portNumber == 11999 {
+		portNumber = 11000
 	}
 }
 
@@ -172,9 +216,13 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	cpuCut := params["cpucut"]
 	memoryCut := params["memorycut"]
 
-	fmt.Println("Cutting")
-	fmt.Println("newCPU: " + newCPU + " newMemory: " + newMemory + " at host: " + hostIP + " cpuCUT: " + cpuCut + " memoryCut: " + memoryCut)
-
+	cpuAux , _ := strconv.ParseInt(newCPU, 10, 64)
+	
+	if cpuAux < 2 {
+		newCPU = "2"
+	}
+	
+	lockUpdate.Lock()
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
         cmd.Stdout = &out
@@ -184,9 +232,9 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
                 fmt.Println("Error using docker run at update task resources after a cut")
                 fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
         }
+	lockUpdate.Unlock()
 
-	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host
-		
+	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host		
 	memoryReduction, _ := strconv.ParseInt(memoryCut,10,64)
 	cpuReduction, _ := strconv.ParseInt(cpuCut,10,64)
 	hostRegion := hosts[hostIP].Region
@@ -877,12 +925,13 @@ func main() {
 	regions = make(map[string]Region)
 	hosts = make(map[string]*Host)
 	locks = make(map[string]Lock)	
-
 	ServeSchedulerRequests()
 }
 
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
+	
+	lockUpdate = &sync.Mutex{}
 
 	lockClassLEE := make(map[string]*sync.Mutex)
 	lockClassDEE := make(map[string]*sync.Mutex)
