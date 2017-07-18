@@ -135,7 +135,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	portNumberAux := strconv.Itoa(portNumber)
 
 	if task.Image == "redis" {
-		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU , "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image,  "--port", portNumberAux)	
+		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
+		cmd := exec.Command("docker", args...)
 		portNumber++
 		var out, stderr bytes.Buffer
 		cmd.Stdout = &out
