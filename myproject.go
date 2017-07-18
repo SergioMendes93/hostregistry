@@ -133,9 +133,11 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 	_ = json.NewDecoder(req.Body).Decode(&task)	
 
 	portNumberAux := strconv.Itoa(portNumber)
+	
+	fmt.Println("Rescheduling: " + task.Image)
 
 	if task.Image == "redis" {
-		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
+		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
 		cmd := exec.Command("docker", args...)
 		portNumber++
 		var out, stderr bytes.Buffer
@@ -147,7 +149,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	} else if task.Image == "sergiomendes/timeserver" {
-		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux, ":", portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "sergiomendes/timeserver", portNumberAux)
+		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "sergiomendes/timeserver", portNumberAux)
 		portNumber++
 		var out, stderr bytes.Buffer
 		cmd.Stdout = &out
@@ -349,8 +351,7 @@ func UpdateHostRegion(hostIP string, newRegion string) {
 }
 
 //first we must remove the host from the previous region then insert it in the new onw
-func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
-	
+func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {	
 	hostClass := host.HostClass
 	//this deletes
 	locks[oldRegion].classHosts[hostClass].Lock()
