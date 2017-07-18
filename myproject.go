@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -65,7 +66,6 @@ var regions map[string]Region
 var hosts map[string]*Host
 
 var locks map[string]Lock //for locking access to regions/class
-var lockUpdate *sync.Mutex
 
 var portNumber = 11000
 
@@ -134,8 +134,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 
 	portNumberAux := strconv.Itoa(portNumber)
 	
-	fmt.Println("Rescheduling: " + task.Image)
-
 	if task.Image == "redis" {
 		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
 		cmd := exec.Command("docker", args...)
@@ -169,7 +167,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("Error using docker run at rescheduling: ffmpeg")
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
-		fmt.Println("rescheduled ffmpeg")
 	} else if task.Image == "enhance" {
 		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/ne/input", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:makespan==150", "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "alexjc/neural-enhance", "--zoom=2", "input/macos.jpg")
 		var out, stderr bytes.Buffer
@@ -180,7 +177,6 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("Error using docker run at rescheduling: enhance")
 			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
-		fmt.Println("rescheduled enhance")
 	}
 
 	//cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","run", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "-e", "affinity:rescheduled==yes", task.Image)
@@ -226,18 +222,31 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 	if cpuAux < 2 {
 		newCPU = "2"
 	}
+
+	fmt.Println("Rescheduling " + taskID)
 	
-	lockUpdate.Lock()
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
         cmd.Stdout = &out
         cmd.Stderr = &stderr
 
         if err := cmd.Run(); err != nil {
-                fmt.Println("Error using docker run at update task resources after a cut")
+                fmt.Println("Error using docker run at update task resources after a cut: " + taskID)
                 fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		//retry
+		time.Sleep(time.Second * 2)
+		fmt.Println("retrying")
+		
+		cmd1 := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
+        	var out1, stderr1 bytes.Buffer
+        	cmd1.Stdout = &out1
+        	cmd1.Stderr = &stderr1
+
+		if err1 := cmd1.Run(); err1 != nil {
+                	fmt.Println("Error using docker run at update task resources after a cut twice: " + taskID)
+                	fmt.Println(fmt.Sprint(err1) + ": " + stderr1.String())
+		}
         }
-	lockUpdate.Unlock()
 
 	//now to update the resources of the host. Because of the cut, less resources will be occupied on the host		
 	memoryReduction, _ := strconv.ParseInt(memoryCut,10,64)
@@ -935,8 +944,6 @@ func main() {
 func ServeSchedulerRequests() {
 	router := mux.NewRouter()
 	
-	lockUpdate = &sync.Mutex{}
-
 	lockClassLEE := make(map[string]*sync.Mutex)
 	lockClassDEE := make(map[string]*sync.Mutex)
 	lockClassEED := make(map[string]*sync.Mutex)
