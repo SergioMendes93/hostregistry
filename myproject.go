@@ -223,7 +223,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 		newCPU = "2"
 	}
 
-	fmt.Println("Rescheduling " + taskID)
+	fmt.Println("Cutting " + taskID)
 	
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
@@ -234,7 +234,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
                 fmt.Println("Error using docker run at update task resources after a cut: " + taskID)
                 fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		//retry
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 5)
 		fmt.Println("retrying")
 		
 		cmd1 := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
