@@ -223,7 +223,6 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 		newCPU = "2"
 	}
 
-	fmt.Println("Cutting " + taskID)
 	
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
@@ -235,7 +234,6 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
                 fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		//retry
 		time.Sleep(time.Second * 5)
-		fmt.Println("retrying")
 		
 		cmd1 := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         	var out1, stderr1 bytes.Buffer
@@ -407,8 +405,6 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 
 	}
 	listHosts = append(listHosts, listHostsDEE...)
-	fmt.Print("Getting hosts LEE and DEE")
-	fmt.Println(listHosts)
 	json.NewEncoder(w).Encode(listHosts)
 
 }
@@ -422,8 +418,6 @@ func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
 	listHostsDEE := GetHostsDEE_kill(requestClass)
 
 	listHosts = append(listHosts, listHostsDEE...)
-	fmt.Print("Getting hosts EED and DEE")
-	fmt.Println(listHosts)
 
 	json.NewEncoder(w).Encode(listHosts)
 }
