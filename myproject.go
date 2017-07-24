@@ -385,6 +385,8 @@ func UpdateHostRegionList(oldRegion string, newRegion string, host *Host) {
 	locks[newRegion].classHosts[hostClass].Unlock()
 }
 
+
+
 //used by initial scheduling and cut algorithm
 func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
@@ -408,6 +410,18 @@ func GetListHostsLEE_DEE(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(listHosts)
 
 }
+
+func GetAllHosts(w http.ResponseWriter, req *http.Request) {
+
+	listHosts := make([]*Host, 0)
+	
+	for hostIP := range hosts {
+		listHosts = append(listHosts, hosts[hostIP])
+	} 
+	
+	json.NewEncoder(w).Encode(listHosts)
+}
+
 
 //used by kill algorithm
 func GetListHostsEED_DEE(w http.ResponseWriter, req *http.Request) {
@@ -475,6 +489,7 @@ func GetHostsLEE_normal(requestClass string) []*Host {
 	}
 	return listHosts
 }
+
 
 //for CUT algorithm
 func GetHostsLEE_cut(requestClass string) []*Host {
@@ -970,6 +985,7 @@ func ServeSchedulerRequests() {
 	regions["DEE"] = Region{classDEE}
 	regions["EED"] = Region{classEED}
 
+	router.HandleFunc("/host/list", GetAllHosts).Methods("GET")
 	router.HandleFunc("/host/list/{requestclass}&{listtype}", GetListHostsLEE_DEE).Methods("GET")
 	router.HandleFunc("/host/listkill/{requestclass}", GetListHostsEED_DEE).Methods("GET")
 	router.HandleFunc("/host/updateclass/{requestclass}&{hostip}", UpdateHostClass).Methods("GET")
