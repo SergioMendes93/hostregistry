@@ -917,6 +917,33 @@ func UpdateMemory(w http.ResponseWriter, req *http.Request) {
 	go UpdateTotalResourcesUtilization(0.0, memoryToUpdate, 3, hostIP)
 }
 
+//this function collects info regarding allocated resources and its resource utilization
+func GatherData2(cpu float64, memory float64, hostIP string, cpuAllocated int64, memoryAllocated int64 ) {
+        //write the data gathered to a file
+        // open files r and w
+        cpuUtilization := strconv.FormatFloat(cpu * 100, 'f', -1, 64)
+        memoryUtilization := strconv.FormatFloat(memory * 100, 'f', -1, 64)
+        cpuAlloc := strconv.FormatInt(cpuAllocated, 10)
+        memoryAlloc := strconv.FormatInt(memoryAllocated, 10)
+
+        fileCPU, err1 := os.OpenFile(hostIP+"CPUAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileMemory, err2 := os.OpenFile(hostIP+"MemoryAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+
+        if err1 != nil || err2 != nil {
+                panic(err1)
+        }
+        defer fileCPU.Close()
+        defer fileMemory.Close()
+
+        if _, err1 = fileCPU.WriteString("CPU usage: " + cpuUtilization + " CPU Allocated: " + cpuAlloc + "\n"); err1 != nil {
+                panic(err1)
+        }
+        if _, err2 = fileMemory.WriteString("Memory usage: " + memoryUtilization + " Memory allocated: " + memoryAlloc + "\n"); err2 != nil {
+                panic(err2)
+        }
+}
+
+
 func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
@@ -926,6 +953,7 @@ func UpdateResources(cpuUpdate int64, memoryUpdate int64, hostIP string) {
     	hosts[hostIP].AllocatedMemory -= memoryUpdate
     	hosts[hostIP].AllocatedCPUs -= cpuUpdate
 
+	go GatherData2(hosts[hostIP].CPU_Utilization, hosts[hostIP].MemoryUtilization, hostIP, hosts[hostIP].AllocatedCPUs, hosts[hostIP].AllocatedMemory) 
 	//update overbooking of this host
 	cpuOverbooking := float64(hosts[hostIP].AllocatedCPUs) / float64(hosts[hostIP].TotalCPUs)
     	memoryOverbooking := float64(hosts[hostIP].AllocatedMemory) / float64(hosts[hostIP].TotalMemory)
