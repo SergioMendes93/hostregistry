@@ -777,24 +777,31 @@ func UpdateBothResources(w http.ResponseWriter, req *http.Request) {
 func GatherData(cpu float64, memory float64, hostIP string) {
 	//write the data gathered to a file
 	// open files r and w
-	cpuUtilization := strconv.FormatFloat(cpu,'f', -1, 64)
-	memoryUtilization := strconv.FormatFloat(memory,'f', -1, 64)
+	cpuUtilization := strconv.FormatFloat(cpu * 100, 'f', -1, 64)
+        memoryUtilization := strconv.FormatFloat(memory * 100, 'f', -1, 64)
 
-     	fileCPU, err1 := os.OpenFile(hostIP+"EnergyCpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-     	fileMemory, err2 := os.OpenFile(hostIP+"EnergyMemory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-     	if err1 != nil || err2 != nil{
-       		panic(err1)
-     	}
+        fileCPU, err1 := os.OpenFile(hostIP+"Cpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileMemory, err2 := os.OpenFile(hostIP+"Memory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileTime, err3 := os.OpenFile(hostIP+"Time.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+             
+
+        if err1 != nil || err2 != nil || err3 != nil{
+                panic(err1)
+        }
         defer fileCPU.Close()
         defer fileMemory.Close()
+        defer fileTime.Close()
 
-     	if _, err1 = fileCPU.WriteString(cpuUtilization+"\n"); err1 != nil {
-      		panic(err1)
-     	}
-     	if _, err2 = fileMemory.WriteString(memoryUtilization+"\n"); err2 != nil {
-      		panic(err2)
-     	}
-
+        if _, err1 = fileCPU.WriteString(cpuUtilization+"\n"); err1 != nil {
+                panic(err1)
+        }
+        if _, err2 = fileMemory.WriteString(memoryUtilization+"\n"); err2 != nil {
+                panic(err2)
+        }
+        t := time.Now()
+        if _, err3 = fileTime.WriteString(t.String()+"\n"); err3 != nil {
+                panic(err3)
+        }
 }
 
 //function whose job is to check whether the total resources should be updated or not.
