@@ -129,7 +129,7 @@ func ReverseSort(classList []*Host, searchValue float64) int {
 }
 
 //Gathers data concering cuts and kills. eventType = 1 -> cut = 2 ->kill 
-func GatherData3(eventType int) {
+func GatherData3(eventType int, cpuCut string, memoryCut string) {
 	if eventType == 1 {
 		fileCPU, err1 := os.OpenFile("Cuts.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
              
@@ -138,7 +138,7 @@ func GatherData3(eventType int) {
         	}
 	        defer fileCPU.Close()
 
-        	if _, err1 = fileCPU.WriteString("1\n"); err1 != nil {
+        	if _, err1 = fileCPU.WriteString("1 CPU cut: " + cpuCut + " memory cut: " + memoryCut + "\n"); err1 != nil {
                 	panic(err1)
         	}
 	} else {
@@ -162,7 +162,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 
 	portNumberAux := strconv.Itoa(portNumber)
 	
-	GatherData3(2)
+	GatherData3(2, "0", "0")
 	
 	if task.Image == "redis" {
 		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
@@ -253,7 +253,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 		newCPU = "2"
 	}
 
-	GatherData3(1)
+	GatherData3(1, cpuCut, memoryCut)
 	
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
@@ -815,7 +815,6 @@ func GatherData(cpu float64, memory float64, hostIP string) {
         fileMemory, err2 := os.OpenFile(hostIP+"Memory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
         fileTime, err3 := os.OpenFile(hostIP+"Time.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
              
-
         if err1 != nil || err2 != nil || err3 != nil{
                 panic(err1)
         }
