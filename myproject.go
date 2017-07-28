@@ -138,7 +138,7 @@ func GatherData3(eventType int, cpuCut string, memoryCut string) {
         	}
 	        defer fileCPU.Close()
 
-        	if _, err1 = fileCPU.WriteString("1 CPU cut: " + cpuCut + " memory cut: " + memoryCut + "\n"); err1 != nil {
+        	if _, err1 = fileCPU.WriteString("CPUcut:" + cpuCut + ",memory cut:" + memoryCut + "\n"); err1 != nil {
                 	panic(err1)
         	}
 	} else {
@@ -382,8 +382,9 @@ func GatherData4(hostIP string, hostRegion string) {
        	}
        defer fileCPU.Close()
 
-        
-	if _, err1 = fileCPU.WriteString(hostRegion+"\n"); err1 != nil {        
+     	t := time.Now()
+   
+	if _, err1 = fileCPU.WriteString(hostRegion + ",Time:" + t.String() + "\n"); err1 != nil {        
         	panic(err1)
         }
 
@@ -829,26 +830,16 @@ func GatherData(cpu float64, memory float64, hostIP string) {
 	cpuUtilization := strconv.FormatFloat(cpu * 100, 'f', -1, 64)
         memoryUtilization := strconv.FormatFloat(memory * 100, 'f', -1, 64)
 
-        fileCPU, err1 := os.OpenFile(hostIP+"Cpu.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-        fileMemory, err2 := os.OpenFile(hostIP+"Memory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-        fileTime, err3 := os.OpenFile(hostIP+"Time.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileCPU, err1 := os.OpenFile(hostIP+"Utilization.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
              
-        if err1 != nil || err2 != nil || err3 != nil{
+        if err1 != nil {
                 panic(err1)
         }
         defer fileCPU.Close()
-        defer fileMemory.Close()
-        defer fileTime.Close()
 
-        if _, err1 = fileCPU.WriteString(cpuUtilization+"\n"); err1 != nil {
+	t := time.Now()
+        if _, err1 = fileCPU.WriteString("CPU:" + cpuUtilization + ",Memory:" + memoryUtilization + ",Time:" + t.String() + "\n"); err1 != nil {
                 panic(err1)
-        }
-        if _, err2 = fileMemory.WriteString(memoryUtilization+"\n"); err2 != nil {
-                panic(err2)
-        }
-        t := time.Now()
-        if _, err3 = fileTime.WriteString(t.String()+"\n"); err3 != nil {
-                panic(err3)
         }
 }
 
@@ -974,28 +965,18 @@ func GatherData2(cpu float64, memory float64, hostIP string, cpuAllocated int64,
         cpuAlloc := strconv.FormatInt(cpuAllocated, 10)
         memoryAlloc := strconv.FormatInt(memoryAllocated, 10)
 
-        fileCPU, err1 := os.OpenFile(hostIP+"CPUAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-        fileMemory, err2 := os.OpenFile(hostIP+"MemoryAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-        fileTime, err3 := os.OpenFile(hostIP+"TimeAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileCPU, err1 := os.OpenFile(hostIP+"Alloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 
-        if err1 != nil || err2 != nil || err3 != nil{
+        if err1 != nil {
                 panic(err1)
         }
         defer fileCPU.Close()
-        defer fileMemory.Close()
-	defer fileTime.Close()
 
-        if _, err1 = fileCPU.WriteString("CPU usage: " + cpuUtilization + " CPU Allocated: " + cpuAlloc + "\n"); err1 != nil {
+        t := time.Now()
+
+        if _, err1 = fileCPU.WriteString("CPUusage:" + cpuUtilization + ",CPUAllocated:" + cpuAlloc + ",MemoryUsage:" + memoryUtilization + ",MemoryAllocated:" + memoryAlloc + ",Time:" + t.String() + "\n"); err1 != nil {
                 panic(err1)
         }
-        if _, err2 = fileMemory.WriteString("Memory usage: " + memoryUtilization + " Memory allocated: " + memoryAlloc + "\n"); err2 != nil {
-                panic(err2)
-        }
-        t := time.Now()
-        if _, err3 = fileTime.WriteString(t.String()+"\n"); err3 != nil {
-                panic(err3)
-        }
-
 }
 
 
