@@ -162,7 +162,7 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 
 	portNumberAux := strconv.Itoa(portNumber)
 	
-	GatherData3(2, "0", "0")
+	go GatherData3(2, "0", "0")
 	
 	if task.Image == "redis" {
 		args := []string{"-H", "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, task.Image, "--port", portNumberAux}
@@ -253,7 +253,7 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
 		newCPU = "2"
 	}
 
-	GatherData3(1, cpuCut, memoryCut)
+	go GatherData3(1, cpuCut, memoryCut)
 	
 	cmd := exec.Command("docker","-H", "tcp://10.5.60.2:2377","update", "-m", newMemory, "-c", newCPU, taskID)
         var out, stderr bytes.Buffer
@@ -373,11 +373,29 @@ func UpdateHostList(hostPreviousClass string, hostNewClass string, host *Host) {
 	locks[hostRegion].classHosts[hostNewClass].Unlock()
 }
 
+//Gathers data about host current region 
+func GatherData4(hostIP string, hostRegion string) {
+	fileCPU, err1 := os.OpenFile(hostIP+"Region.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+             
+       	if err1 != nil {
+               	panic(err1)
+       	}
+       defer fileCPU.Close()
+
+        
+	if _, err1 = fileCPU.WriteString(hostRegion+"\n"); err1 != nil {        
+        	panic(err1)
+        }
+
+}
+
 //implies list change
 func UpdateHostRegion(hostIP string, newRegion string) {
 	
 	hostRegion := hosts[hostIP].Region
 	hostClass := hosts[hostIP].HostClass
+	
+	go GatherData4(hostIP, newRegion)
 
 	locks[hostRegion].classHosts[hostClass].Lock()
 	oldRegion := hostRegion
@@ -845,7 +863,7 @@ func UpdateTotalResourcesUtilization(cpu float64, memory float64, updateType int
 
 	//benchmark purposes, gathering data
 	locks[hostRegion].classHosts[hostClass].Lock()
-        GatherData(hosts[hostIP].CPU_Utilization, hosts[hostIP].MemoryUtilization, hostIP)
+        go GatherData(hosts[hostIP].CPU_Utilization, hosts[hostIP].MemoryUtilization, hostIP)
         locks[hostRegion].classHosts[hostClass].Unlock()
 
 
