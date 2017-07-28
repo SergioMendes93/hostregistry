@@ -143,8 +143,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 		cmd.Stderr = &stderr
 	
 		if err := cmd.Run(); err != nil {
-			fmt.Println("Error using docker run at rescheduling: redis")
-			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			//fmt.Println("Error using docker run at rescheduling: redis")
+			//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	} else if task.Image == "sergiomendes/timeserver" {
 		cmd := exec.Command("docker", "-H",  "tcp://10.5.60.2:2377", "run", "-itd", "-p", portNumberAux + ":" + portNumberAux, "-c", task.CPU, "-m", task.Memory,  "-e", "affinity:makespan==300", "-e", "affinity:port==" + portNumberAux, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "sergiomendes/timeserver", portNumberAux)
@@ -154,8 +154,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 		cmd.Stderr = &stderr
 	
 		if err := cmd.Run(); err != nil {
-			fmt.Println("Error using docker run at rescheduling: timeserver")
-			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			//fmt.Println("Error using docker run at rescheduling: timeserver")
+			//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	} else if task.Image == "ffmpeg" {
 		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/tmp/workdir", "-w=/tmp/workdir", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:makespan==150", "-e", "affinity:requesttype==" + task.TaskType, "jrottenberg/ffmpeg", "-i", "dead.avi", "-r", "100", "-b", "700k", "-qscale", "0", "-ab", "160k", "-ar", "44100", "result"+portNumberAux+".dvd", "-y")
@@ -164,8 +164,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 		cmd.Stderr = &stderr
 	
 		if err := cmd.Run(); err != nil {
-			fmt.Println("Error using docker run at rescheduling: ffmpeg")
-			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			//fmt.Println("Error using docker run at rescheduling: ffmpeg")
+			//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	} else if task.Image == "enhance" {
 		cmd := exec.Command("docker", "-H", "tcp://10.5.60.2:2377", "run", "-v", "/home/smendes:/ne/input", "-itd", "-c", task.CPU, "-m", task.Memory, "-e", "affinity:makespan==150", "-e", "affinity:requestclass==" + task.TaskClass, "-e", "affinity:requesttype==" + task.TaskType, "alexjc/neural-enhance", "--zoom=2", "input/macos.jpg")
@@ -174,8 +174,8 @@ func RescheduleTask(w http.ResponseWriter, req *http.Request) {
 		cmd.Stderr = &stderr
 	
 		if err := cmd.Run(); err != nil {
-			fmt.Println("Error using docker run at rescheduling: enhance")
-			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			//fmt.Println("Error using docker run at rescheduling: enhance")
+			//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		}
 	}
 
@@ -230,8 +230,8 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
         cmd.Stderr = &stderr
 
         if err := cmd.Run(); err != nil {
-                fmt.Println("Error using docker run at update task resources after a cut: " + taskID)
-                fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+                //fmt.Println("Error using docker run at update task resources after a cut: " + taskID)
+                //fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		//retry
 		time.Sleep(time.Second * 5)
 		
@@ -241,8 +241,8 @@ func UpdateTaskResources(w http.ResponseWriter, req *http.Request) {
         	cmd1.Stderr = &stderr1
 
 		if err1 := cmd1.Run(); err1 != nil {
-                	fmt.Println("Error using docker run at update task resources after a cut twice: " + taskID)
-                	fmt.Println(fmt.Sprint(err1) + ": " + stderr1.String())
+                	//fmt.Println("Error using docker run at update task resources after a cut twice: " + taskID)
+                	//fmt.Println(fmt.Sprint(err1) + ": " + stderr1.String())
 		}
         }
 
@@ -928,12 +928,14 @@ func GatherData2(cpu float64, memory float64, hostIP string, cpuAllocated int64,
 
         fileCPU, err1 := os.OpenFile(hostIP+"CPUAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
         fileMemory, err2 := os.OpenFile(hostIP+"MemoryAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        fileTime, err3 := os.OpenFile(hostIP+"TimeAlloc.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 
-        if err1 != nil || err2 != nil {
+        if err1 != nil || err2 != nil || err3 != nil{
                 panic(err1)
         }
         defer fileCPU.Close()
         defer fileMemory.Close()
+	defer fileTime.Close()
 
         if _, err1 = fileCPU.WriteString("CPU usage: " + cpuUtilization + " CPU Allocated: " + cpuAlloc + "\n"); err1 != nil {
                 panic(err1)
@@ -941,6 +943,11 @@ func GatherData2(cpu float64, memory float64, hostIP string, cpuAllocated int64,
         if _, err2 = fileMemory.WriteString("Memory usage: " + memoryUtilization + " Memory allocated: " + memoryAlloc + "\n"); err2 != nil {
                 panic(err2)
         }
+        t := time.Now()
+        if _, err3 = fileTime.WriteString(t.String()+"\n"); err3 != nil {
+                panic(err3)
+        }
+
 }
 
 
