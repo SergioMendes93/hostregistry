@@ -137,8 +137,9 @@ func GatherData3(eventType int, cpuCut string, memoryCut string) {
                 	panic(err1)
         	}
 	        defer fileCPU.Close()
+		t := time.Now()
 
-        	if _, err1 = fileCPU.WriteString("CPUcut:" + cpuCut + ",memory cut:" + memoryCut + "\n"); err1 != nil {
+        	if _, err1 = fileCPU.WriteString("CPUcut:" + cpuCut + ",memory cut:" + memoryCut + ",time:" + t.String() + "\n"); err1 != nil {
                 	panic(err1)
         	}
 	} else {
